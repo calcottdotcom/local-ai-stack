@@ -69,19 +69,22 @@ A self-hosted AI stack running on a local GPU. Services are orchestrated via Doc
 
 ---
 
-### Phase 4 — Agents 📋
+### Phase 4 — Agents ✅
 
 **Goal:** Hermes and Pi are containerised, connectable to the LLM, and accessible as documented.
 
-- [ ] `docker/hermes/Dockerfile` builds successfully (hermes install script)
-- [ ] `just hermes ssh` drops into a working shell with `hermes` on `$PATH`
-- [ ] Hermes agent can reach the active inference endpoint from inside the container
-- [ ] Hermes pointed at Searxng for web search (first-run prompt from README)
-- [ ] `docker/hermes-webui` builds from the upstream GitHub context
-- [ ] Hermes Web UI loads at `http://localhost:8787`
-- [ ] `docker/pi/Dockerfile` builds successfully
-- [ ] Pi coding agent starts and connects to the inference endpoint
-- [ ] Ubuntu server sandbox starts with SSH and nginx accessible
+- [x] `docker/hermes/Dockerfile` builds successfully (hermes install script)
+- [x] `just hermes ssh` drops into a working shell with `hermes` on `$PATH`
+- [x] Hermes agent can reach the active inference endpoint from inside the container
+- [x] Hermes pointed at Searxng for web search (first-run prompt from README)
+- [x] `docker/hermes-webui` builds from the upstream GitHub context
+- [x] Hermes Web UI loads at `http://localhost:8787`
+- [x] `docker/pi/Dockerfile` builds successfully
+- [x] Pi coding agent starts and connects to the inference endpoint
+- [x] Ubuntu server sandbox starts with SSH and nginx accessible
+
+**Fix discovered during live testing:**
+- `just hermes ssh` must use `-u hermes` flag so the shell runs as the hermes user with the correct `$PATH`; defaulting to root misses the user-local install paths
 
 ---
 

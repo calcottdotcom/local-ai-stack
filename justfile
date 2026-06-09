@@ -164,8 +164,8 @@ set provider model:
 hermes action="ssh":
     #!/usr/bin/env bash
     case "{{action}}" in
-        ssh) docker exec -it hermes bash ;;
-        *)   docker exec -it hermes {{action}} ;;
+        ssh) docker exec -it -u hermes hermes bash ;;
+        *)   docker exec -it -u hermes hermes {{action}} ;;
     esac
 
 # ── Setup ──────────────────────────────────────────────────────────────────
