@@ -38,4 +38,5 @@ if [[ -n "$LLAMACPP_MDL" ]]; then
     cfg model_aliases.llamacpp.context_length  "$CTX"
 fi
 
-exec sleep infinity
+cd /opt/hermes-webui
+exec /opt/hermes-webui-venv/bin/python server.py

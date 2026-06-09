@@ -33,8 +33,16 @@ RUN curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash
 # Ensure hermes binary is on PATH
 ENV PATH="/home/hermes/.local/bin:/home/hermes/.hermes/bin:${PATH}"
 
-# Entrypoint writes cli-config.yaml from env vars, then keeps container alive
+EXPOSE 8787
+
+# Clone hermes-webui outside /home/hermes (which is a volume mount) so the
+# venv and source survive volume attachment without being shadowed.
 USER root
+RUN git clone --depth 1 https://github.com/nesquena/hermes-webui.git /opt/hermes-webui \
+    && python3 -m venv /opt/hermes-webui-venv \
+    && /opt/hermes-webui-venv/bin/pip install --no-cache-dir pyyaml cryptography \
+    && chown -R hermes:hermes /opt/hermes-webui /opt/hermes-webui-venv
+
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 USER hermes

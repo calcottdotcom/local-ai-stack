@@ -19,7 +19,7 @@ search:
 server:
   # Change this to a random string in production.
   # Generate with: openssl rand -hex 32
-  secret_key: "CHANGE_ME_TO_A_RANDOM_STRING"
+  secret_key: "e6e61ea3e943fd05c324c4e4b2e588750aeaac5d47c7059966133d05bdfea466"
   limiter: false
   public_instance: false
   image_proxy: true
