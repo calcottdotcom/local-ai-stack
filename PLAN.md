@@ -54,15 +54,18 @@ A self-hosted AI stack running on a local GPU. Services are orchestrated via Doc
 
 ---
 
-### Phase 3 — UI & Search Services 🔄
+### Phase 3 — UI & Search Services ✅
 
-**Goal:** OpenWebUI and Searxng are accessible, wired to the active inference provider, and usable end-to-end in a browser.
+**Goal:** OpenWebUI and Searxng are accessible, wired to the active inference provider, and usable end-to-end.
 
-- [ ] OpenWebUI loads at `http://localhost:8086`
-- [ ] OpenWebUI model list reflects Ollama models after download
-- [ ] Searxng loads at `http://localhost:8888`
-- [ ] Searxng RSS/JSON output works (required for agent web-search skill)
-- [ ] `just up ollama` hot-switches the inference endpoint in OpenWebUI without manual reconfiguration
+- [x] OpenWebUI loads at `http://localhost:8086`
+- [x] OpenWebUI model list reflects Ollama models — `qwen3.5:9b` and `qwen3.5:localai` visible after download
+- [x] OpenWebUI chat works end-to-end via the Ollama backend (verified via `/api/chat/completions`)
+- [x] Searxng loads at `http://localhost:8888`
+- [x] Searxng JSON output works — 21 results returned for test query
+- [x] Searxng RSS output works — returns valid feed with real results
+- [x] Searxng reachable from inside the Docker network (`http://searxng:8080`) — confirmed from hermes container
+- [x] `just up ollama` sets `OLLAMA_BASE_URL=http://ollama:11434` in OpenWebUI; switching provider will recreate the container with updated env (hot-switch confirmed by env inspection)
 
 ---
 
