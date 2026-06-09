@@ -1,0 +1,8 @@
+# Active env — contains secrets
+.env
+
+# Generated SSL certs
+config/nginx/certs/
+
+# OS
+.DS_Store

@@ -1,0 +1,23 @@
+volumes:
+  llamacpp-models:
+
+services:
+  llamacpp:
+    # GPU overlay files override this with the correct CUDA/ROCm image.
+    # CPU-only fallback for testing without GPU.
+    image: ghcr.io/ggml-org/llama.cpp:server
+    container_name: llamacpp
+    ports:
+      - "${LLAMACPP_PORT:-8089}:8080"
+    volumes:
+      - llamacpp-models:/models
+    command: >
+      --model /models/${LLAMACPP_MODEL}
+      --host 0.0.0.0
+      --port 8080
+      --ctx-size ${LLAMACPP_CTX:-8192}
+      --n-gpu-layers ${LLAMACPP_GPU_LAYERS:-99}
+      --mtp
+    networks:
+      - local-ai-net
+    restart: unless-stopped
