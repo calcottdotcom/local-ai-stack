@@ -32,7 +32,12 @@ if [[ "$PROVIDER" == "ollama" ]]; then
         die "Ollama container is not running. Start with: just up ollama"
 
     # Check if the localai-tuned variant already exists to avoid unnecessary re-pulls
-    TAGGED_MODEL="${MODEL%:*}:localai"
+    # Preserve the param-count tag: qwen3.5:9b → qwen3.5:9b-localai
+    if [[ "$MODEL" == *:* ]]; then
+        TAGGED_MODEL="${MODEL}-localai"
+    else
+        TAGGED_MODEL="${MODEL}:localai"
+    fi
     if docker exec ollama ollama list 2>/dev/null | grep -qF "${TAGGED_MODEL}"; then
         ok "Model '$TAGGED_MODEL' already exists"
         info "To re-download, first run: docker exec ollama ollama rm ${TAGGED_MODEL}"
@@ -63,7 +68,6 @@ if [[ "$PROVIDER" == "ollama" ]]; then
     MODELFILE_CONTENT="FROM ${MODEL}
 PARAMETER num_ctx ${CTX}"
 
-    TAGGED_MODEL="${MODEL%:*}:localai"
     info "Creating tuned model: $TAGGED_MODEL"
 
     # Write Modelfile into the container and create the model
@@ -74,6 +78,18 @@ PARAMETER num_ctx ${CTX}"
     "
     ok "Model ready: $TAGGED_MODEL (context: $CTX tokens)"
     info "Storage: docker volume 'local-ai-stack_ollama-models'"
+
+    # Track the active model in .env so agents pick it up on next start
+    sed -i "s|^OLLAMA_MODEL=.*|OLLAMA_MODEL=${TAGGED_MODEL}|" "$ROOT_DIR/.env"
+    sed -i "s|^INFERENCE_MODEL=.*|INFERENCE_MODEL=${TAGGED_MODEL}|" "$ROOT_DIR/.env"
+
+    # Restart running agent containers so they pick up the new model immediately
+    for agent in hermes pi; do
+        if docker ps -q --filter name="^${agent}$" | grep -q .; then
+            info "Restarting ${agent} to pick up new model..."
+            docker restart "$agent" > /dev/null
+        fi
+    done
 
 # ─────────────────────────────────────────────────────────────────────────
 # LLAMA.CPP
