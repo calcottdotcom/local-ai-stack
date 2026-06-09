@@ -30,7 +30,8 @@ detect_gpu() {
 
 recommend_model() {
     local vram_gb=$1
-    if   (( vram_gb >= 24 )); then echo "gemma4:12b or qwen3.5:9b (you have headroom for large context)"
+    if   (( vram_gb >= 24 )); then echo "gemma4:12b (128K context with room to spare)"
+    elif (( vram_gb >= 16 )); then echo "gemma4:12b"
     elif (( vram_gb >= 12 )); then echo "qwen3.5:9b"
     elif (( vram_gb >=  8 )); then echo "qwen3.5:7b"
     elif (( vram_gb >=  6 )); then echo "qwen3.5:4b (limited context — consider a smaller model)"
