@@ -49,7 +49,7 @@ if [[ "$PROVIDER" == "ollama" ]]; then
     if   echo "$MODEL" | grep -qi '70b\|72b'; then MODEL_SIZE_GB=42
     elif echo "$MODEL" | grep -qi '30b\|32b\|34b'; then MODEL_SIZE_GB=20
     elif echo "$MODEL" | grep -qi '13b\|14b'; then MODEL_SIZE_GB=8
-    elif echo "$MODEL" | grep -qi '12b'; then MODEL_SIZE_GB=7
+    elif echo "$MODEL" | grep -qi '12b'; then MODEL_SIZE_GB=8
     elif echo "$MODEL" | grep -qi '9b'; then MODEL_SIZE_GB=6
     elif echo "$MODEL" | grep -qi '7b\|8b'; then MODEL_SIZE_GB=5
     elif echo "$MODEL" | grep -qi '4b\|3b'; then MODEL_SIZE_GB=3
