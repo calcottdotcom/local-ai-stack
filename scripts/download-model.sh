@@ -31,8 +31,18 @@ if [[ "$PROVIDER" == "ollama" ]]; then
     docker ps -q --filter name=ollama | grep -q . || \
         die "Ollama container is not running. Start with: just up ollama"
 
+    # Check if the localai-tuned variant already exists to avoid unnecessary re-pulls
+    TAGGED_MODEL="${MODEL%:*}:localai"
+    if docker exec ollama ollama list 2>/dev/null | grep -qF "${TAGGED_MODEL}"; then
+        ok "Model '$TAGGED_MODEL' already exists"
+        info "To re-download, first run: docker exec ollama ollama rm ${TAGGED_MODEL}"
+        exit 0
+    fi
+
     bold "Pulling model: $MODEL"
-    docker exec ollama ollama pull "$MODEL"
+    if ! docker exec ollama ollama pull "$MODEL"; then
+        die "Pull failed — check network connectivity and that '$MODEL' is a valid Ollama model tag"
+    fi
     ok "Model pulled"
 
     # Estimate model size from name to calculate available VRAM for context
@@ -69,6 +79,22 @@ PARAMETER num_ctx ${CTX}"
 # LLAMA.CPP
 # ─────────────────────────────────────────────────────────────────────────
 elif [[ "$PROVIDER" == "llamacpp" ]]; then
+    # Check if a GGUF already exists in the volume to avoid re-downloading
+    existing_gguf=$(docker run --rm \
+        -v local-ai-stack_llamacpp-models:/models \
+        alpine sh -c "ls /models/*.gguf 2>/dev/null | head -1" 2>/dev/null || true)
+    if [[ -n "$existing_gguf" ]]; then
+        existing_name=$(basename "$existing_gguf")
+        warn "Found existing model in volume: $existing_name"
+        read -rp "  Re-download and replace? [y/N]: " OVERWRITE
+        OVERWRITE=${OVERWRITE:-N}
+        if [[ ! "$OVERWRITE" =~ ^[Yy]$ ]]; then
+            ok "Keeping existing model: $existing_name"
+            info "If you need a different context size, update LLAMACPP_CTX in .env manually."
+            exit 0
+        fi
+    fi
+
     bold "Downloading model from HuggingFace: $MODEL"
     info "This may take a while depending on model size and internet speed..."
 

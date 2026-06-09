@@ -34,13 +34,18 @@ A self-hosted AI stack running on a local GPU. Services are orchestrated via Doc
 
 **Goal:** Verify that Ollama and Llama.cpp containers start, accept requests, and serve models correctly. Establish the VRAM-to-context sizing logic with a real GPU.
 
+- [x] Health checks on Ollama and Llama.cpp compose services
+- [x] `just up` waits for service readiness after `docker compose up -d`
+- [x] `just test-inference` and CI smoke test prove Ollama starts and serves requests (CPU mode)
+- [x] MTP flag corrected to `--spec-type draft-mtp`; controlled via `LLAMACPP_EXTRA_ARGS` in `.env`
+- [x] `just download` idempotent — skips re-pull/re-download if model already present
 - [ ] Boot test: `just up ollama` starts without errors on a Linux/Nvidia machine
-- [ ] Boot test: `just up llamacpp` starts without errors
+- [ ] Boot test: `just up llamacpp` starts without errors on a Linux/Nvidia machine
 - [ ] `just download ollama model qwen3.5:9b` — pull succeeds and Modelfile is applied
 - [ ] `just download llamacpp model <hf-repo>` — GGUF downloaded, model set in `.env`
 - [ ] Provider switch interlock: switching from ollama → llamacpp stops ollama container
 - [ ] VRAM-based context sizing produces sensible values across the 6/8/12/24 GB tiers
-- [ ] Llama.cpp MTP flag (`--mtp`) verified against a model that supports it
+- [ ] `--spec-type draft-mtp` verified against a model that supports it (Qwen3/DeepSeek)
 
 ---
 
