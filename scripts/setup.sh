@@ -20,13 +20,49 @@ echo ""
 bold "Local AI Stack — Setup"
 echo "────────────────────────────────────────"
 
+if [[ "$PLATFORM" == "wsl" ]]; then
+    info "Detected: Windows (WSL2)"
+elif [[ "$PLATFORM" == "mac" ]]; then
+    info "Detected: macOS"
+fi
+
 missing=()
 command -v docker &>/dev/null || missing+=("docker")
 command -v just   &>/dev/null || missing+=("just")
 
 if [[ ${#missing[@]} -gt 0 ]]; then
     warn "Missing required tools: ${missing[*]}"
-    warn "Install them then re-run this setup."
+    echo ""
+    for tool in "${missing[@]}"; do
+        case "$tool" in
+            docker)
+                warn "docker — install Docker Desktop:"
+                if [[ "$PLATFORM" == "wsl" ]]; then
+                    info "https://docs.docker.com/desktop/setup/install/windows-install/"
+                    info "Enable 'Use WSL 2 based engine' in Docker Desktop → Settings → General"
+                    info "Then enable your WSL distro under Settings → Resources → WSL Integration"
+                elif [[ "$PLATFORM" == "mac" ]]; then
+                    info "https://docs.docker.com/desktop/setup/install/mac-install/"
+                else
+                    info "https://docs.docker.com/engine/install/"
+                fi
+                ;;
+            just)
+                warn "just — install the command runner:"
+                if [[ "$PLATFORM" == "wsl" || "$PLATFORM" == "linux" ]]; then
+                    info "Ubuntu/Debian:  sudo apt install just"
+                    info "Universal:      curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to ~/.local/bin"
+                    if [[ "$PLATFORM" == "wsl" ]]; then
+                        info "(Run these commands inside your WSL terminal, not PowerShell)"
+                    fi
+                elif [[ "$PLATFORM" == "mac" ]]; then
+                    info "Homebrew:  brew install just"
+                fi
+                ;;
+        esac
+    done
+    echo ""
+    warn "Re-run this script once the above are installed."
     exit 1
 fi
 ok "docker and just are installed"

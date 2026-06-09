@@ -19,11 +19,55 @@ There's loads of options for running local LLMs as well as utilities that can si
 Each of these is outlined in more detail below. There's a one-shot docker compose file and some just commands you can run to go with the defaults, and a set of config and .env files you can edit to customise. 
 
 ## Requirements
-This is currently targeting a linux environment with a dedicated GPU (ideally Nvidia, though AMD should work). Just is used to wrap bash and other commands, as is docker for containers.
 
-To pass through your GPU to the docker containers:
-* On Nvidia, you'll need to install the Nvidia Container Toolkit, as well as the official Nvidia linux drivers. 
-* On AMD you'll need to install rocm and add your user to the render and video groups
+You'll need **Docker** and **just** installed. The stack runs on Linux, Windows (via WSL2), and macOS.
+
+### Linux (native)
+
+Install the [Nvidia Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) for Nvidia GPU passthrough, or ROCm + video/render group membership for AMD.
+
+```bash
+sudo apt install just        # Ubuntu/Debian
+# or: curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to ~/.local/bin
+```
+
+### Windows (WSL2)
+
+WSL2 lets you run the full stack inside a Linux environment on Windows. Docker Desktop handles the container runtime and GPU passthrough.
+
+**Step 1 — Enable WSL2** (skip if already done):
+```powershell
+# Run in PowerShell as Administrator
+wsl --install
+# Restart when prompted, then open the Ubuntu app to finish setup
+```
+
+**Step 2 — Install Docker Desktop for Windows:**
+[https://docs.docker.com/desktop/setup/install/windows-install/](https://docs.docker.com/desktop/setup/install/windows-install/)
+
+In Docker Desktop → Settings → General: enable **"Use WSL 2 based engine"**.  
+In Docker Desktop → Settings → Resources → WSL Integration: enable your Ubuntu distro.
+
+**Step 3 — Install `just` inside WSL** (open the Ubuntu/WSL terminal):
+```bash
+sudo apt install just
+```
+
+**Step 4 — Nvidia GPU passthrough** (skip if no Nvidia GPU):  
+Install the [Nvidia CUDA drivers for WSL](https://developer.nvidia.com/cuda/wsl) on Windows (not inside WSL — the Windows driver is sufficient). Verify with `nvidia-smi` inside WSL.
+
+**Step 5 — Clone and run:**
+```bash
+git clone https://github.com/calcottdotcom/local-ai-stack.git
+cd local-ai-stack
+just setup
+```
+
+> All commands run inside your WSL terminal. The stack itself runs in Docker — no Linux knowledge required beyond the above.
+
+### macOS
+
+macOS support is in progress. Docker Desktop + Homebrew (`brew install just`) is the intended path; Apple Silicon GPU passthrough via Ollama's Metal backend is planned.
 
 ## Getting started
 ### Setup

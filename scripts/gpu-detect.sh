@@ -2,6 +2,23 @@
 # Outputs two lines: GPU_TYPE and VRAM_GB
 # Sourced by setup.sh; can also be run standalone.
 
+# Returns: linux | wsl | mac
+detect_platform() {
+    case "$(uname -s)" in
+        Darwin) echo "mac" ;;
+        Linux)
+            if grep -qi "microsoft\|wsl" /proc/version 2>/dev/null; then
+                echo "wsl"
+            else
+                echo "linux"
+            fi
+            ;;
+        *) echo "linux" ;;
+    esac
+}
+
+PLATFORM="$(detect_platform)"
+
 detect_gpu() {
     if command -v nvidia-smi &>/dev/null; then
         local vram
@@ -53,6 +70,7 @@ recommend_ctx() {
 # Run standalone
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     detect_gpu
+    echo "Platform : $PLATFORM"
     echo "GPU type : $GPU_TYPE"
     echo "VRAM     : ${VRAM_GB}GB"
     echo "Suggested: $(recommend_model "$VRAM_GB")"
