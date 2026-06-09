@@ -1,0 +1,49 @@
+use_default_settings: true
+
+general:
+  instance_name: "LocalAI Search"
+  privacypolicy_url: false
+  donation_url: false
+  contact_url: false
+  enable_metrics: false
+
+search:
+  safe_search: 0
+  autocomplete: ""
+  formats:
+    - html
+    - json
+    - rss
+    - csv
+
+server:
+  # Change this to a random string in production.
+  # Generate with: openssl rand -hex 32
+  secret_key: "CHANGE_ME_TO_A_RANDOM_STRING"
+  limiter: false
+  public_instance: false
+  image_proxy: true
+
+ui:
+  static_use_hash: true
+  default_theme: simple
+  query_in_title: false
+  infinite_scroll: false
+
+engines:
+  - name: google
+    engine: google
+    shortcut: g
+
+  - name: bing
+    engine: bing
+    shortcut: b
+
+  - name: duckduckgo
+    engine: duckduckgo
+    shortcut: d
+
+  - name: wikipedia
+    engine: wikipedia
+    shortcut: wp
+    categories: general

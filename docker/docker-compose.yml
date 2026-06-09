@@ -1,0 +1,121 @@
+name: local-ai-stack
+
+networks:
+  local-ai-net:
+    driver: bridge
+
+volumes:
+  openwebui-data:
+  hermes-home:
+  hermes-webui-state:
+  opendesign-data:
+
+services:
+  openwebui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: openwebui
+    ports:
+      - "${OPENWEBUI_PORT:-8086}:8080"
+    environment:
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://ollama:11434}
+      - OPENAI_API_BASE_URL=${OPENAI_API_BASE_URL:-}
+      - WEBUI_AUTH=false
+    volumes:
+      - openwebui-data:/app/backend/data
+    networks:
+      - local-ai-net
+    restart: unless-stopped
+
+  searxng:
+    image: searxng/searxng:latest
+    container_name: searxng
+    ports:
+      - "${SEARXNG_PORT:-8888}:8080"
+    volumes:
+      - ./config/searxng:/etc/searxng:rw
+    environment:
+      - SEARXNG_BASE_URL=http://searxng:8080
+    networks:
+      - local-ai-net
+    restart: unless-stopped
+
+  hermes:
+    build: ./hermes
+    container_name: hermes
+    volumes:
+      - hermes-home:/home/hermes
+    environment:
+      - INFERENCE_BASE_URL=${INFERENCE_BASE_URL:-http://ollama:11434/v1}
+      - OPENAI_API_BASE_URL=${INFERENCE_BASE_URL:-http://ollama:11434/v1}
+    networks:
+      - local-ai-net
+    restart: unless-stopped
+
+  hermes-webui:
+    build:
+      context: https://github.com/nesquena/hermes-webui.git
+    container_name: hermes-webui
+    ports:
+      - "${HERMES_PORT:-8787}:8787"
+    volumes:
+      - hermes-home:/home/hermeswebui/.hermes
+      - hermes-webui-state:/home/hermeswebui/.hermes/webui
+    environment:
+      - WANTED_UID=${HOST_UID:-1000}
+      - WANTED_GID=${HOST_GID:-1000}
+      - HERMES_WEBUI_HOST=0.0.0.0
+      - HERMES_WEBUI_PORT=8787
+      - HERMES_WEBUI_STATE_DIR=/home/hermeswebui/.hermes/webui
+    networks:
+      - local-ai-net
+    restart: unless-stopped
+
+  pi:
+    build: ./pi
+    container_name: pi
+    environment:
+      - INFERENCE_BASE_URL=${INFERENCE_BASE_URL:-http://ollama:11434/v1}
+      - OPENAI_API_BASE_URL=${INFERENCE_BASE_URL:-http://ollama:11434/v1}
+    networks:
+      - local-ai-net
+    restart: unless-stopped
+
+  ubuntu-server:
+    build: ./ubuntu-server
+    container_name: ubuntu-server
+    ports:
+      - "${SERVER_PORT:-8087}:80"
+    networks:
+      - local-ai-net
+    restart: unless-stopped
+
+  opendesign:
+    image: ${OPEN_DESIGN_IMAGE:-vanjayak/open-design:latest}
+    container_name: opendesign
+    ports:
+      - "${OPENDESIGN_PORT:-7456}:7456"
+    volumes:
+      - opendesign-data:/app/.od
+    environment:
+      - "OD_API_TOKEN=${OD_API_TOKEN:?OD_API_TOKEN must be set (generate with: openssl rand -hex 32)}"
+    networks:
+      - local-ai-net
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./config/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./config/nginx/certs:/etc/nginx/certs:ro
+    networks:
+      - local-ai-net
+    restart: unless-stopped
+    depends_on:
+      - openwebui
+      - searxng
+      - hermes-webui

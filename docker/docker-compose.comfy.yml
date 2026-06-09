@@ -1,0 +1,19 @@
+volumes:
+  comfyui-models:
+  comfyui-output:
+
+services:
+  comfyui:
+    # GPU overlay files override this with the correct CUDA/ROCm image.
+    image: ghcr.io/ai-dock/comfyui:latest
+    container_name: comfyui
+    ports:
+      - "${COMFYUI_PORT:-8188}:8188"
+    volumes:
+      - comfyui-models:/opt/ComfyUI/models
+      - comfyui-output:/opt/ComfyUI/output
+    environment:
+      - AUTO_UPDATE=false
+    networks:
+      - local-ai-net
+    restart: unless-stopped

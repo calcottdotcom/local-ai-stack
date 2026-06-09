@@ -1,0 +1,149 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+
+# Cancel redundant runs on the same PR
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── Docker Compose syntax ─────────────────────────────────────────────────
+  compose-syntax:
+    name: Compose — syntax
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create test .env (no real secrets needed for syntax check)
+        run: |
+          cp .env.example .env
+          # OD_API_TOKEN uses :? in the compose file so must be non-empty
+          sed -i "s|^OD_API_TOKEN=.*|OD_API_TOKEN=ci-test-$(openssl rand -hex 8)|" .env
+
+      - name: base + ollama (nvidia)
+        run: |
+          docker compose --project-directory . \
+            -f docker/docker-compose.yml \
+            -f docker/docker-compose.ollama.yml \
+            -f docker/docker-compose.gpu-nvidia-ollama.yml \
+            config --quiet
+
+      - name: base + ollama (amd)
+        run: |
+          docker compose --project-directory . \
+            -f docker/docker-compose.yml \
+            -f docker/docker-compose.ollama.yml \
+            -f docker/docker-compose.gpu-amd-ollama.yml \
+            config --quiet
+
+      - name: base + llamacpp (nvidia)
+        run: |
+          docker compose --project-directory . \
+            -f docker/docker-compose.yml \
+            -f docker/docker-compose.llamacpp.yml \
+            -f docker/docker-compose.gpu-nvidia-llamacpp.yml \
+            config --quiet
+
+      - name: base + llamacpp (amd)
+        run: |
+          docker compose --project-directory . \
+            -f docker/docker-compose.yml \
+            -f docker/docker-compose.llamacpp.yml \
+            -f docker/docker-compose.gpu-amd-llamacpp.yml \
+            config --quiet
+
+      - name: comfy (nvidia)
+        run: |
+          docker compose --project-directory . \
+            -f docker/docker-compose.yml \
+            -f docker/docker-compose.comfy.yml \
+            -f docker/docker-compose.gpu-nvidia-comfy.yml \
+            config --quiet
+
+      - name: comfy (amd)
+        run: |
+          docker compose --project-directory . \
+            -f docker/docker-compose.yml \
+            -f docker/docker-compose.comfy.yml \
+            -f docker/docker-compose.gpu-amd-comfy.yml \
+            config --quiet
+
+  # ── Dockerfile linting ────────────────────────────────────────────────────
+  dockerfile-lint:
+    name: Dockerfiles — hadolint
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        dockerfile:
+          - docker/hermes/Dockerfile
+          - docker/pi/Dockerfile
+          - docker/ubuntu-server/Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: ${{ matrix.dockerfile }}
+          # .hadolint.yaml in repo root is picked up automatically
+
+  # ── Shell script linting ──────────────────────────────────────────────────
+  shellcheck:
+    name: Scripts — shellcheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ludeeus/action-shellcheck@master
+        with:
+          # Scan both scripts/ and the ubuntu-server entrypoint
+          scandir: ./scripts
+          additional_files: docker/ubuntu-server/entrypoint.sh
+          # .shellcheckrc in repo root is picked up automatically
+
+  # ── Justfile syntax ───────────────────────────────────────────────────────
+  justfile:
+    name: Justfile — syntax
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: extractions/setup-just@v2
+      - name: Check justfile parses and all recipes are listed
+        run: just --list
+
+  # ── Nginx config syntax ───────────────────────────────────────────────────
+  nginx-config:
+    name: Nginx — config syntax
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test nginx config with nginx -t
+        # nginx resolves proxy_pass hostnames during -t, so stub them with --add-host
+        run: |
+          docker run --rm \
+            -v "$PWD/config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro" \
+            -v "$PWD/config/nginx/conf.d:/etc/nginx/conf.d:ro" \
+            --add-host openwebui:127.0.0.1 \
+            --add-host ollama:127.0.0.1 \
+            --add-host llamacpp:127.0.0.1 \
+            --add-host searxng:127.0.0.1 \
+            --add-host hermes-webui:127.0.0.1 \
+            --add-host ubuntu-server:127.0.0.1 \
+            --add-host comfyui:127.0.0.1 \
+            --add-host opendesign:127.0.0.1 \
+            nginx:alpine nginx -t
+
+  # ── GPU smoke test (no GPU in CI — always allow failure) ──────────────────
+  gpu-smoke:
+    name: GPU check (expected to fail — no GPU in CI)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: extractions/setup-just@v2
+      - name: Create test .env
+        run: |
+          cp .env.example .env
+          sed -i "s|^OD_API_TOKEN=.*|OD_API_TOKEN=ci-test-$(openssl rand -hex 8)|" .env
+      - name: Run gpucheck (no GPU available — expected to fail)
+        run: just gpucheck

@@ -1,0 +1,10 @@
+services:
+  comfyui:
+    image: ghcr.io/ai-dock/comfyui:latest-cuda
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

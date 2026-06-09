@@ -1,0 +1,13 @@
+# Hadolint configuration for local-ai-stack Dockerfiles.
+# Only errors block the build; warnings are surfaced but ignored.
+failure-threshold: error
+
+ignore:
+  # apt-get version pinning is impractical for base tooling in this project
+  - DL3008
+  # npm package version pinning — we intentionally install latest agent releases
+  - DL3016
+  # curl piped to bash — deliberate choice for hermes/nodesource install scripts
+  - DL4006
+  # apt-get without --no-install-recommends — acceptable trade-off here
+  - DL3015
