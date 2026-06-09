@@ -85,7 +85,13 @@ services:
     container_name: pi
     environment:
       - INFERENCE_BASE_URL=${INFERENCE_BASE_URL:-http://ollama:11434/v1}
-      - OPENAI_API_BASE_URL=${INFERENCE_BASE_URL:-http://ollama:11434/v1}
+      - OPENAI_BASE_URL=${INFERENCE_BASE_URL:-http://ollama:11434/v1}
+      - OPENAI_API_KEY=ollama
+      - INFERENCE_PROVIDER=${INFERENCE_PROVIDER:-ollama}
+      - INFERENCE_MODEL=${INFERENCE_MODEL:-}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-}
+      - LLAMACPP_MODEL=${LLAMACPP_MODEL:-}
+      - LLAMACPP_CTX=${LLAMACPP_CTX:-65536}
     networks:
       - local-ai-net
     restart: unless-stopped
