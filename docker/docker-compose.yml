@@ -40,7 +40,7 @@ services:
     restart: unless-stopped
 
   hermes:
-    build: ./hermes
+    build: ./docker/hermes
     container_name: hermes
     volumes:
       - hermes-home:/home/hermes
@@ -71,7 +71,7 @@ services:
     restart: unless-stopped
 
   pi:
-    build: ./pi
+    build: ./docker/pi
     container_name: pi
     environment:
       - INFERENCE_BASE_URL=${INFERENCE_BASE_URL:-http://ollama:11434/v1}
@@ -81,7 +81,7 @@ services:
     restart: unless-stopped
 
   ubuntu-server:
-    build: ./ubuntu-server
+    build: ./docker/ubuntu-server
     container_name: ubuntu-server
     ports:
       - "${SERVER_PORT:-8087}:80"
