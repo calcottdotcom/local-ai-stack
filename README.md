@@ -7,8 +7,7 @@ There's loads of options for running local LLMs as well as utilities that can si
 * An LLM inference engine. We'll be using [Ollama](https://ollama.com/) or [Llama.cpp](https://github.com/ggml-org/llama.cpp) - both with benefits over each other.
 * A web-based chat UI for that ChatGPT feel. We'll use [OpenWebUI](https://github.com/open-webui/open-webui)
 * A web search service for the chat UI and other services to use. We'll use [Searxng](https://github.com/searxng/searxng)
-* A generalist AI agent, which you can use to get to do stuff. We'll use [Hermes](https://github.com/nousresearch/hermes-agent)
-* A web ui for the generalist agent. We'll use [Hermes Web UI](https://github.com/nesquena/hermes-webui)
+* A generalist AI agent with a built-in web UI, which you can use to get things done. We'll use [Hermes](https://github.com/nousresearch/hermes-agent) with [Hermes Web UI](https://github.com/nesquena/hermes-webui) embedded in the same container
 * A coding AI agent, lightweight and dedicated to coding as opposed to the generalist. We'll use [Pi Coding Agent](https://github.com/earendil-works/pi)
 * A general web server which the agents can ssh into to run things. We'll use an ubuntu container - asking the agents to setup nginx etc.
 * A reverse proxy to allow for domain mapping to these container services on different ports. We'll use nginx. Along with this we have a wrapper for local domains and SSL using [mkcert](https://github.com/filosottile/mkcert) and your `/etc/hosts` file (optional but makes things feel more like real-world services!).
@@ -141,7 +140,7 @@ The quickest test to ensure the basics are working is to run `just up ollama` th
 Next, go to the chat UI and you should see the model named in the top left. If using ollama, you can choose between multiple models you've downloaded.
 
 ## Starting with agents
-Running `just hermes ssh` will ssh into the hermes container. This container has persistent volumes so anything installed by apt or in the home folders will survive a reboot. Running `hermes` within the ssh session will start the hermes session - on the first run its usually a good idea to tell the agent who they are and how to behave / sound.
+Running `just hermes ssh` will ssh into the hermes container. The hermes container runs as root, so the agent can `apt-get install` freely during a session. To persist a package across container restarts, add it to `~/.hermes/apt-packages.txt` (one per line) — those packages are reinstalled automatically on every start. Files and Python venvs created inside the workspace (`~/workspace/`) live on a persistent Docker volume and survive restarts normally. Running `hermes` within the ssh session will start the hermes session - on the first run it's usually a good idea to tell the agent who they are and how to behave / sound.
 
 By default the agents don't know how to do web searches using the tools we've given them. So for the first prompt, try:
 ```
