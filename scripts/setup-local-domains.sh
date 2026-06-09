@@ -62,8 +62,8 @@ info "Generating certificates in $CERTS_DIR..."
     mkcert "${DOMAINS[@]}"
     # mkcert outputs a single cert covering all domains
     # Rename to predictable names for nginx
-    mv *+*.pem localai.pem   2>/dev/null || true
-    mv *+*-key.pem localai-key.pem 2>/dev/null || true
+    mv ./*+*.pem localai.pem   2>/dev/null || true
+    mv ./*+*-key.pem localai-key.pem 2>/dev/null || true
 )
 ok "Certificates generated"
 

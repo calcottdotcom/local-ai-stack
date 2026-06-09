@@ -40,7 +40,7 @@ services:
     restart: unless-stopped
 
   hermes:
-    build: ./docker/hermes
+    build: ./hermes
     container_name: hermes
     volumes:
       - hermes-home:/home/hermes
@@ -71,7 +71,7 @@ services:
     restart: unless-stopped
 
   pi:
-    build: ./docker/pi
+    build: ./pi
     container_name: pi
     environment:
       - INFERENCE_BASE_URL=${INFERENCE_BASE_URL:-http://ollama:11434/v1}
@@ -81,7 +81,7 @@ services:
     restart: unless-stopped
 
   ubuntu-server:
-    build: ./docker/ubuntu-server
+    build: ./ubuntu-server
     container_name: ubuntu-server
     ports:
       - "${SERVER_PORT:-8087}:80"
@@ -97,7 +97,7 @@ services:
     volumes:
       - opendesign-data:/app/.od
     environment:
-      - OD_API_TOKEN=${OD_API_TOKEN:?OD_API_TOKEN must be set - run: openssl rand -hex 32}
+      - "OD_API_TOKEN=${OD_API_TOKEN:?OD_API_TOKEN must be set (generate with: openssl rand -hex 32)}"
     networks:
       - local-ai-net
     restart: unless-stopped

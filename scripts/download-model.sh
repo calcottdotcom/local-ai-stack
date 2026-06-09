@@ -36,7 +36,6 @@ if [[ "$PROVIDER" == "ollama" ]]; then
     ok "Model pulled"
 
     # Estimate model size from name to calculate available VRAM for context
-    MODEL_BASE=$(echo "$MODEL" | sed 's/:.*//; s/\..*//; s/-.*//i')
     if   echo "$MODEL" | grep -qi '70b\|72b'; then MODEL_SIZE_GB=42
     elif echo "$MODEL" | grep -qi '30b\|32b\|34b'; then MODEL_SIZE_GB=20
     elif echo "$MODEL" | grep -qi '13b\|14b'; then MODEL_SIZE_GB=8

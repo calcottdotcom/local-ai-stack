@@ -1,5 +1,12 @@
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
+# Base docker compose command — sets project root so bind-mount paths in
+# compose files resolve relative to the repo root, not docker/.
+dc := "docker compose --project-directory ."
+
+# Directory prefix for compose files
+cf := "docker/"
+
 # Show available commands
 default:
     @just --list
@@ -18,17 +25,17 @@ up provider:
     ollama)
         if [[ -n "$(docker ps -q --filter name=llamacpp 2>/dev/null)" ]]; then
             echo "Stopping llamacpp before starting ollama..."
-            docker compose -f docker-compose.yml -f docker-compose.llamacpp.yml \
-                -f "docker-compose.gpu-${GPU}-llamacpp.yml" down llamacpp 2>/dev/null || true
+            {{dc}} -f {{cf}}docker-compose.yml -f {{cf}}docker-compose.llamacpp.yml \
+                -f "{{cf}}docker-compose.gpu-${GPU}-llamacpp.yml" down llamacpp 2>/dev/null || true
         fi
-        sed -i "s|^INFERENCE_PROVIDER=.*|INFERENCE_PROVIDER=ollama|"       .env
+        sed -i "s|^INFERENCE_PROVIDER=.*|INFERENCE_PROVIDER=ollama|"              .env
         sed -i "s|^INFERENCE_BASE_URL=.*|INFERENCE_BASE_URL=http://ollama:11434/v1|" .env
-        sed -i "s|^OLLAMA_BASE_URL=.*|OLLAMA_BASE_URL=http://ollama:11434|" .env
-        sed -i "s|^OPENAI_API_BASE_URL=.*|OPENAI_API_BASE_URL=|"           .env
-        docker compose \
-            -f docker-compose.yml \
-            -f docker-compose.ollama.yml \
-            -f "docker-compose.gpu-${GPU}-ollama.yml" \
+        sed -i "s|^OLLAMA_BASE_URL=.*|OLLAMA_BASE_URL=http://ollama:11434|"        .env
+        sed -i "s|^OPENAI_API_BASE_URL=.*|OPENAI_API_BASE_URL=|"                  .env
+        {{dc}} \
+            -f {{cf}}docker-compose.yml \
+            -f {{cf}}docker-compose.ollama.yml \
+            -f "{{cf}}docker-compose.gpu-${GPU}-ollama.yml" \
             up -d
         ;;
     llamacpp)
@@ -38,28 +45,25 @@ up provider:
         }
         if [[ -n "$(docker ps -q --filter name=ollama 2>/dev/null)" ]]; then
             echo "Stopping ollama before starting llamacpp..."
-            docker compose -f docker-compose.yml -f docker-compose.ollama.yml \
-                -f "docker-compose.gpu-${GPU}-ollama.yml" down ollama 2>/dev/null || true
+            {{dc}} -f {{cf}}docker-compose.yml -f {{cf}}docker-compose.ollama.yml \
+                -f "{{cf}}docker-compose.gpu-${GPU}-ollama.yml" down ollama 2>/dev/null || true
         fi
-        sed -i "s|^INFERENCE_PROVIDER=.*|INFERENCE_PROVIDER=llamacpp|"        .env
+        sed -i "s|^INFERENCE_PROVIDER=.*|INFERENCE_PROVIDER=llamacpp|"                .env
         sed -i "s|^INFERENCE_BASE_URL=.*|INFERENCE_BASE_URL=http://llamacpp:8080/v1|" .env
-        sed -i "s|^OLLAMA_BASE_URL=.*|OLLAMA_BASE_URL=|"                       .env
+        sed -i "s|^OLLAMA_BASE_URL=.*|OLLAMA_BASE_URL=|"                              .env
         sed -i "s|^OPENAI_API_BASE_URL=.*|OPENAI_API_BASE_URL=http://llamacpp:8080/v1|" .env
-        docker compose \
-            -f docker-compose.yml \
-            -f docker-compose.llamacpp.yml \
-            -f "docker-compose.gpu-${GPU}-llamacpp.yml" \
+        {{dc}} \
+            -f {{cf}}docker-compose.yml \
+            -f {{cf}}docker-compose.llamacpp.yml \
+            -f "{{cf}}docker-compose.gpu-${GPU}-llamacpp.yml" \
             up -d
         ;;
     comfy)
-        source .env
-        GPU="${GPU_TYPE:-nvidia}"
-        PROVIDER="${INFERENCE_PROVIDER:-ollama}"
         echo "Note: ComfyUI uses the GPU. If running alongside llamacpp on a single GPU, VRAM will be shared."
-        docker compose \
-            -f docker-compose.yml \
-            -f docker-compose.comfy.yml \
-            -f "docker-compose.gpu-${GPU}-comfy.yml" \
+        {{dc}} \
+            -f {{cf}}docker-compose.yml \
+            -f {{cf}}docker-compose.comfy.yml \
+            -f "{{cf}}docker-compose.gpu-${GPU}-comfy.yml" \
             up -d comfyui
         ;;
     *)
@@ -74,10 +78,10 @@ down:
     source .env 2>/dev/null || true
     GPU="${GPU_TYPE:-nvidia}"
     PROVIDER="${INFERENCE_PROVIDER:-ollama}"
-    docker compose \
-        -f docker-compose.yml \
-        -f "docker-compose.${PROVIDER}.yml" \
-        -f "docker-compose.gpu-${GPU}-${PROVIDER}.yml" \
+    {{dc}} \
+        -f {{cf}}docker-compose.yml \
+        -f "{{cf}}docker-compose.${PROVIDER}.yml" \
+        -f "{{cf}}docker-compose.gpu-${GPU}-${PROVIDER}.yml" \
         down
 
 # Restart a single service (e.g. just restart openwebui)
@@ -86,10 +90,10 @@ restart service:
     source .env 2>/dev/null || true
     GPU="${GPU_TYPE:-nvidia}"
     PROVIDER="${INFERENCE_PROVIDER:-ollama}"
-    docker compose \
-        -f docker-compose.yml \
-        -f "docker-compose.${PROVIDER}.yml" \
-        -f "docker-compose.gpu-${GPU}-${PROVIDER}.yml" \
+    {{dc}} \
+        -f {{cf}}docker-compose.yml \
+        -f "{{cf}}docker-compose.${PROVIDER}.yml" \
+        -f "{{cf}}docker-compose.gpu-${GPU}-${PROVIDER}.yml" \
         restart {{service}}
 
 # Show status of all local-ai-stack containers
@@ -103,16 +107,16 @@ logs service="":
     GPU="${GPU_TYPE:-nvidia}"
     PROVIDER="${INFERENCE_PROVIDER:-ollama}"
     if [[ -z "{{service}}" ]]; then
-        docker compose \
-            -f docker-compose.yml \
-            -f "docker-compose.${PROVIDER}.yml" \
-            -f "docker-compose.gpu-${GPU}-${PROVIDER}.yml" \
+        {{dc}} \
+            -f {{cf}}docker-compose.yml \
+            -f "{{cf}}docker-compose.${PROVIDER}.yml" \
+            -f "{{cf}}docker-compose.gpu-${GPU}-${PROVIDER}.yml" \
             logs -f
     else
-        docker compose \
-            -f docker-compose.yml \
-            -f "docker-compose.${PROVIDER}.yml" \
-            -f "docker-compose.gpu-${GPU}-${PROVIDER}.yml" \
+        {{dc}} \
+            -f {{cf}}docker-compose.yml \
+            -f "{{cf}}docker-compose.${PROVIDER}.yml" \
+            -f "{{cf}}docker-compose.gpu-${GPU}-${PROVIDER}.yml" \
             logs -f {{service}}
     fi
 
@@ -169,21 +173,23 @@ test-compose:
     # Use a temp env so we never clobber the real .env
     TMPENV=$(mktemp)
     trap 'rm -f "$TMPENV"' EXIT
-    cp .env.example "$TMPENV"
-    sed -i "s|^OD_API_TOKEN=.*|OD_API_TOKEN=ci-test-$(openssl rand -hex 8)|" "$TMPENV"
+    # Strip OD_API_TOKEN from example and append a non-empty value.
+    # Avoids sed -i portability differences between macOS and Linux.
+    grep -v '^OD_API_TOKEN=' .env.example > "$TMPENV"
+    echo "OD_API_TOKEN=ci-test-$(openssl rand -hex 8)" >> "$TMPENV"
 
     check() {
         echo "  → $*"
-        docker compose --env-file "$TMPENV" "$@" config --quiet
+        {{dc}} --env-file "$TMPENV" "$@" config --quiet
     }
 
     echo "Validating compose files..."
-    check -f docker-compose.yml -f docker-compose.ollama.yml   -f docker-compose.gpu-nvidia-ollama.yml
-    check -f docker-compose.yml -f docker-compose.ollama.yml   -f docker-compose.gpu-amd-ollama.yml
-    check -f docker-compose.yml -f docker-compose.llamacpp.yml -f docker-compose.gpu-nvidia-llamacpp.yml
-    check -f docker-compose.yml -f docker-compose.llamacpp.yml -f docker-compose.gpu-amd-llamacpp.yml
-    check -f docker-compose.yml -f docker-compose.comfy.yml    -f docker-compose.gpu-nvidia-comfy.yml
-    check -f docker-compose.yml -f docker-compose.comfy.yml    -f docker-compose.gpu-amd-comfy.yml
+    check -f {{cf}}docker-compose.yml -f {{cf}}docker-compose.ollama.yml   -f {{cf}}docker-compose.gpu-nvidia-ollama.yml
+    check -f {{cf}}docker-compose.yml -f {{cf}}docker-compose.ollama.yml   -f {{cf}}docker-compose.gpu-amd-ollama.yml
+    check -f {{cf}}docker-compose.yml -f {{cf}}docker-compose.llamacpp.yml -f {{cf}}docker-compose.gpu-nvidia-llamacpp.yml
+    check -f {{cf}}docker-compose.yml -f {{cf}}docker-compose.llamacpp.yml -f {{cf}}docker-compose.gpu-amd-llamacpp.yml
+    check -f {{cf}}docker-compose.yml -f {{cf}}docker-compose.comfy.yml    -f {{cf}}docker-compose.gpu-nvidia-comfy.yml
+    check -f {{cf}}docker-compose.yml -f {{cf}}docker-compose.comfy.yml    -f {{cf}}docker-compose.gpu-amd-comfy.yml
     echo "✓ All compose files valid"
 
 # Lint all Dockerfiles with hadolint (runs via Docker — no local install needed)
@@ -206,12 +212,17 @@ test-scripts:
     #!/usr/bin/env bash
     set -euo pipefail
     echo "Linting shell scripts..."
+    # Expand globs on the host side and map to container /mnt paths.
+    # (mapfile is bash 4+, unavailable on macOS's bash 3.2 — use while read)
+    scripts=()
+    while IFS= read -r f; do
+        scripts+=("/mnt/$f")
+    done < <(find scripts/ docker/ubuntu-server/ -name '*.sh' | sort)
     docker run --rm \
         -v "$PWD:/mnt:ro" \
         koalaman/shellcheck:stable \
         --rcfile /mnt/.shellcheckrc \
-        /mnt/scripts/*.sh \
-        /mnt/docker/ubuntu-server/entrypoint.sh
+        "${scripts[@]}"
     echo "✓ All scripts pass shellcheck"
 
 # Test nginx config syntax
@@ -219,9 +230,19 @@ test-nginx:
     #!/usr/bin/env bash
     set -euo pipefail
     echo "Testing nginx config syntax..."
+    # nginx resolves proxy_pass hostnames during 'nginx -t', so we stub them
+    # with --add-host to allow the syntax check without a running stack.
     docker run --rm \
         -v "$PWD/config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro" \
         -v "$PWD/config/nginx/conf.d:/etc/nginx/conf.d:ro" \
+        --add-host openwebui:127.0.0.1 \
+        --add-host ollama:127.0.0.1 \
+        --add-host llamacpp:127.0.0.1 \
+        --add-host searxng:127.0.0.1 \
+        --add-host hermes-webui:127.0.0.1 \
+        --add-host ubuntu-server:127.0.0.1 \
+        --add-host comfyui:127.0.0.1 \
+        --add-host opendesign:127.0.0.1 \
         nginx:alpine nginx -t
     echo "✓ nginx config valid"
 

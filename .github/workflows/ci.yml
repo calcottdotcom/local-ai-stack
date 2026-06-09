@@ -25,50 +25,50 @@ jobs:
 
       - name: base + ollama (nvidia)
         run: |
-          docker compose \
-            -f docker-compose.yml \
-            -f docker-compose.ollama.yml \
-            -f docker-compose.gpu-nvidia-ollama.yml \
+          docker compose --project-directory . \
+            -f docker/docker-compose.yml \
+            -f docker/docker-compose.ollama.yml \
+            -f docker/docker-compose.gpu-nvidia-ollama.yml \
             config --quiet
 
       - name: base + ollama (amd)
         run: |
-          docker compose \
-            -f docker-compose.yml \
-            -f docker-compose.ollama.yml \
-            -f docker-compose.gpu-amd-ollama.yml \
+          docker compose --project-directory . \
+            -f docker/docker-compose.yml \
+            -f docker/docker-compose.ollama.yml \
+            -f docker/docker-compose.gpu-amd-ollama.yml \
             config --quiet
 
       - name: base + llamacpp (nvidia)
         run: |
-          docker compose \
-            -f docker-compose.yml \
-            -f docker-compose.llamacpp.yml \
-            -f docker-compose.gpu-nvidia-llamacpp.yml \
+          docker compose --project-directory . \
+            -f docker/docker-compose.yml \
+            -f docker/docker-compose.llamacpp.yml \
+            -f docker/docker-compose.gpu-nvidia-llamacpp.yml \
             config --quiet
 
       - name: base + llamacpp (amd)
         run: |
-          docker compose \
-            -f docker-compose.yml \
-            -f docker-compose.llamacpp.yml \
-            -f docker-compose.gpu-amd-llamacpp.yml \
+          docker compose --project-directory . \
+            -f docker/docker-compose.yml \
+            -f docker/docker-compose.llamacpp.yml \
+            -f docker/docker-compose.gpu-amd-llamacpp.yml \
             config --quiet
 
       - name: comfy (nvidia)
         run: |
-          docker compose \
-            -f docker-compose.yml \
-            -f docker-compose.comfy.yml \
-            -f docker-compose.gpu-nvidia-comfy.yml \
+          docker compose --project-directory . \
+            -f docker/docker-compose.yml \
+            -f docker/docker-compose.comfy.yml \
+            -f docker/docker-compose.gpu-nvidia-comfy.yml \
             config --quiet
 
       - name: comfy (amd)
         run: |
-          docker compose \
-            -f docker-compose.yml \
-            -f docker-compose.comfy.yml \
-            -f docker-compose.gpu-amd-comfy.yml \
+          docker compose --project-directory . \
+            -f docker/docker-compose.yml \
+            -f docker/docker-compose.comfy.yml \
+            -f docker/docker-compose.gpu-amd-comfy.yml \
             config --quiet
 
   # ── Dockerfile linting ────────────────────────────────────────────────────
@@ -96,7 +96,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ludeeus/action-shellcheck@master
         with:
+          # Scan both scripts/ and the ubuntu-server entrypoint
           scandir: ./scripts
+          additional_files: docker/ubuntu-server/entrypoint.sh
           # .shellcheckrc in repo root is picked up automatically
 
   # ── Justfile syntax ───────────────────────────────────────────────────────
@@ -116,10 +118,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Test nginx config with nginx -t
+        # nginx resolves proxy_pass hostnames during -t, so stub them with --add-host
         run: |
           docker run --rm \
             -v "$PWD/config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro" \
             -v "$PWD/config/nginx/conf.d:/etc/nginx/conf.d:ro" \
+            --add-host openwebui:127.0.0.1 \
+            --add-host ollama:127.0.0.1 \
+            --add-host llamacpp:127.0.0.1 \
+            --add-host searxng:127.0.0.1 \
+            --add-host hermes-webui:127.0.0.1 \
+            --add-host ubuntu-server:127.0.0.1 \
+            --add-host comfyui:127.0.0.1 \
+            --add-host opendesign:127.0.0.1 \
             nginx:alpine nginx -t
 
   # ── GPU smoke test (no GPU in CI — always allow failure) ──────────────────
