@@ -38,5 +38,8 @@ if [[ -n "$LLAMACPP_MDL" ]]; then
     cfg model_aliases.llamacpp.context_length  "$CTX"
 fi
 
+# Use hermes's own venv Python so run_agent and all hermes deps are importable.
+HERMES_PYTHON="/home/hermes/.hermes/hermes-agent/venv/bin/python"
+
 cd /opt/hermes-webui
-exec /opt/hermes-webui-venv/bin/python server.py
+exec "$HERMES_PYTHON" server.py

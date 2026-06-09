@@ -39,9 +39,7 @@ EXPOSE 8787
 # venv and source survive volume attachment without being shadowed.
 USER root
 RUN git clone --depth 1 https://github.com/nesquena/hermes-webui.git /opt/hermes-webui \
-    && python3 -m venv /opt/hermes-webui-venv \
-    && /opt/hermes-webui-venv/bin/pip install --no-cache-dir pyyaml cryptography \
-    && chown -R hermes:hermes /opt/hermes-webui /opt/hermes-webui-venv
+    && chown -R hermes:hermes /opt/hermes-webui
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
