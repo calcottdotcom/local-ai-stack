@@ -4,17 +4,17 @@ There's loads of options for running local LLMs as well as utilities that can si
 ## Key Components
  The parts listed below help make a local LLM go from "oh, interesting" to "wow - useful!". All are optional, swappable, learnable and expandable. This is an initial set of services which can replicate some cloud AI functionality on a local GPU.
 
-* An LLM inference engine. We'll be using Ollama or Llama.cpp - both with benefits over each other.
-* A web-based chat UI for that ChatGPT feel. We'll use OpenWebUI
-* A web search service for the chat UI and other services to use. We'll use Searxng
-* A generalist AI agent, which you can use to get to do stuff. We'll use Hermes
-* A web ui for the generalist agent. We'll use Hermes Web UI
-* A coding AI agent, lightweight and dedicated to coding as opposed to the generalist. We'll use Pi Coding Agent
+* An LLM inference engine. We'll be using [Ollama](https://ollama.com/) or [Llama.cpp](https://github.com/ggml-org/llama.cpp) - both with benefits over each other.
+* A web-based chat UI for that ChatGPT feel. We'll use [OpenWebUI](https://github.com/open-webui/open-webui)
+* A web search service for the chat UI and other services to use. We'll use [Searxng](https://github.com/searxng/searxng)
+* A generalist AI agent, which you can use to get to do stuff. We'll use [Hermes](https://github.com/nousresearch/hermes-agent)
+* A web ui for the generalist agent. We'll use [Hermes Web UI](https://github.com/nesquena/hermes-webui)
+* A coding AI agent, lightweight and dedicated to coding as opposed to the generalist. We'll use [Pi Coding Agent](https://github.com/earendil-works/pi)
 * A general web server which the agents can ssh into to run things. We'll use an ubuntu container - asking the agents to setup nginx etc.
-* A reverse proxy to allow for domain mapping to these container services on different ports. We'll use nginx.
-* A wrapper for local domains and SSL using mkcert and your /etc/hosts file (optional but makes things feel more like real-world services!).
-* A simple media-generation workflow service, using comfyui.
-* Some simple containers wrapped behind just commands to prove that all the GPU passthrough is working (e.g. `just gpucheck`)
+* A reverse proxy to allow for domain mapping to these container services on different ports. We'll use nginx. Along with this we have a wrapper for local domains and SSL using [mkcert](https://github.com/filosottile/mkcert) and your `/etc/hosts` file (optional but makes things feel more like real-world services!).
+* A web-design tool using AI, using [open design](https://github.com/nexu-io/open-design)
+* A simple media-generation workflow service, using [comfyui](https://github.com/comfy-org/comfyui).
+* Some simple containers wrapped behind just commands to prove that all the GPU passthrough is working (e.g. `just gpucheck`) which use things like nvtop, nvidia-smi etc.
 
 Each of these is outlined in more detail below. There's a one-shot docker compose file and some just commands you can run to go with the defaults, and a set of config and .env files you can edit to customise. 
 
