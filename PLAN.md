@@ -91,7 +91,20 @@ A self-hosted AI stack running on a local GPU. Services are orchestrated via Doc
 
 ---
 
-### Phase 5 — Reverse Proxy & Local Domains 📋
+### Phase 5 — Mac & Windows Support 📋
+
+**Goal:** The stack runs on Mac (Apple Silicon / Intel) and Windows (WSL2) with appropriate GPU or CPU-only fallback.
+
+- [ ] Determine GPU passthrough approach for Mac (Metal via Ollama's native support)
+- [ ] Determine GPU passthrough approach for Windows (WSL2 + Nvidia)
+- [ ] OS detection in `just setup` and `scripts/gpu-detect.sh`
+- [ ] Compose GPU overlays for Mac/Windows variants where needed
+- [ ] `sed -i` portability fixed for macOS (`sed -i ''`)
+- [ ] README updated with Mac/Windows instructions
+
+---
+
+### Phase 6 — Reverse Proxy & Local Domains 📋
 
 **Goal:** All services accessible via `*.localai` with HTTPS.
 
@@ -102,7 +115,7 @@ A self-hosted AI stack running on a local GPU. Services are orchestrated via Doc
 
 ---
 
-### Phase 6 — Media & Design 📋
+### Phase 7 — Media & Design 📋
 
 **Goal:** ComfyUI and OpenDesign running and accessible.
 
@@ -114,7 +127,7 @@ A self-hosted AI stack running on a local GPU. Services are orchestrated via Doc
 
 ---
 
-### Phase 7 — Llama.cpp Inference 📋
+### Phase 8 — Llama.cpp Inference 📋
 
 **Goal:** Verify llama.cpp with a real GGUF model and confirm MTP speculative decoding gives a meaningful speed boost over baseline.
 
@@ -126,7 +139,7 @@ A self-hosted AI stack running on a local GPU. Services are orchestrated via Doc
 
 ---
 
-### Phase 8 — `just setup` Polish 📋
+### Phase 9 — `just setup` Polish 📋
 
 **Goal:** A new user can run `just setup` on a fresh Linux + GPU machine and be ready to chat within 10 minutes.
 
@@ -135,19 +148,6 @@ A self-hosted AI stack running on a local GPU. Services are orchestrated via Doc
 - [ ] Model recommendations match actual VRAM tiers
 - [ ] All prompts have sensible defaults so Enter-through works
 - [ ] Error messages are clear when prerequisites (docker, just, drivers) are missing
-
----
-
-### Phase 9 — Mac & Windows Support 📋
-
-**Goal:** The stack runs on Mac (Apple Silicon / Intel) and Windows (WSL2) with appropriate GPU or CPU-only fallback.
-
-- [ ] Determine GPU passthrough approach for Mac (Metal via Ollama's native support)
-- [ ] Determine GPU passthrough approach for Windows (WSL2 + Nvidia)
-- [ ] OS detection in `just setup` and `scripts/gpu-detect.sh`
-- [ ] Compose GPU overlays for Mac/Windows variants where needed
-- [ ] `sed -i` portability fixed for macOS (`sed -i ''`)
-- [ ] README updated with Mac/Windows instructions
 
 ---
 
