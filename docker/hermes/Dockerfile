@@ -20,8 +20,9 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
-# Create the hermes user that will own the agent data volume
-RUN useradd -m -s /bin/bash hermes
+# Ubuntu 24.04 ships with an 'ubuntu' user at uid 1000. Remove it so hermes
+# can take uid 1000, which matches the volume ownership on the host.
+RUN userdel -r ubuntu && useradd -m -u 1000 -s /bin/bash hermes
 
 USER hermes
 WORKDIR /home/hermes
