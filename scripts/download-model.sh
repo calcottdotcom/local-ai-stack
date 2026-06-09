@@ -32,7 +32,12 @@ if [[ "$PROVIDER" == "ollama" ]]; then
         die "Ollama container is not running. Start with: just up ollama"
 
     # Check if the localai-tuned variant already exists to avoid unnecessary re-pulls
-    TAGGED_MODEL="${MODEL%:*}:localai"
+    # Preserve the param-count tag: qwen3.5:9b → qwen3.5:9b-localai
+    if [[ "$MODEL" == *:* ]]; then
+        TAGGED_MODEL="${MODEL}-localai"
+    else
+        TAGGED_MODEL="${MODEL}:localai"
+    fi
     if docker exec ollama ollama list 2>/dev/null | grep -qF "${TAGGED_MODEL}"; then
         ok "Model '$TAGGED_MODEL' already exists"
         info "To re-download, first run: docker exec ollama ollama rm ${TAGGED_MODEL}"
@@ -63,7 +68,6 @@ if [[ "$PROVIDER" == "ollama" ]]; then
     MODELFILE_CONTENT="FROM ${MODEL}
 PARAMETER num_ctx ${CTX}"
 
-    TAGGED_MODEL="${MODEL%:*}:localai"
     info "Creating tuned model: $TAGGED_MODEL"
 
     # Write Modelfile into the container and create the model
