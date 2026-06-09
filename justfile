@@ -249,19 +249,11 @@ test-nginx:
     #!/usr/bin/env bash
     set -euo pipefail
     echo "Testing nginx config syntax..."
-    # nginx resolves proxy_pass hostnames during 'nginx -t', so we stub them
-    # with --add-host to allow the syntax check without a running stack.
+    # proxy_pass uses $upstream variables so nginx defers DNS resolution to
+    # request time — no --add-host stubs needed for the syntax check.
     docker run --rm \
         -v "$PWD/config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro" \
         -v "$PWD/config/nginx/conf.d:/etc/nginx/conf.d:ro" \
-        --add-host openwebui:127.0.0.1 \
-        --add-host ollama:127.0.0.1 \
-        --add-host llamacpp:127.0.0.1 \
-        --add-host searxng:127.0.0.1 \
-        --add-host hermes-webui:127.0.0.1 \
-        --add-host ubuntu-server:127.0.0.1 \
-        --add-host comfyui:127.0.0.1 \
-        --add-host opendesign:127.0.0.1 \
         nginx:alpine nginx -t
     echo "✓ nginx config valid"
 
