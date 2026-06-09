@@ -30,54 +30,42 @@ A self-hosted AI stack running on a local GPU. Services are orchestrated via Doc
 
 ---
 
-### Phase 2 — Core Inference Services 🔄
+### Phase 2 — Core Inference (Ollama) ✅
 
-**Goal:** Verify that Ollama and Llama.cpp containers start, accept requests, and serve models correctly. Establish the VRAM-to-context sizing logic with a real GPU.
+**Goal:** Verify that Ollama starts, accepts GPU-accelerated requests, and serves models correctly on a real Linux/Nvidia machine.
 
-- [x] Health checks on Ollama and Llama.cpp compose services
+- [x] Health checks on Ollama compose service
 - [x] `just up` waits for service readiness after `docker compose up -d`
 - [x] `just test-inference` and CI smoke test prove Ollama starts and serves requests (CPU mode)
-- [x] MTP flag corrected to `--spec-type draft-mtp`; controlled via `LLAMACPP_EXTRA_ARGS` in `.env`
-- [x] `just download` idempotent — skips re-pull/re-download if model already present
+- [x] `just download` idempotent — skips re-pull if model already present
 - [x] Boot test: `just up ollama` starts without errors on Linux/Nvidia (RTX 5060 Ti, Ubuntu 24.04)
 - [x] `just download ollama model qwen3.5:9b` — pull succeeds and Modelfile applied (65536 ctx for 15GB VRAM)
 - [x] GPU inference: **55.7 tok/s** on 9B model, 9GB VRAM utilisation on RTX 5060 Ti
 - [x] VRAM-based context sizing verified: 15GB / ~6GB model → 65536 tokens
-- [x] Provider switch interlock: `just up llamacpp` stops ollama before starting (confirmed)
+- [x] Provider switch interlock: switching to llamacpp stops ollama container (confirmed)
 - [x] `just gpucheck` works on Linux/Nvidia
-- [ ] Boot test: `just up llamacpp` — deferred (see Phase 2b below)
-- [ ] `just download llamacpp model <hf-repo>` — deferred
-- [ ] `--spec-type draft-mtp` verified against a model that supports it — deferred
 
-**Also fixed during Phase 2 testing:**
+**Fixes discovered during live testing:**
 - Build context paths: `./hermes` → `./docker/hermes` (required by `--project-directory .`)
-- nginx: replaced `proxy_pass http://host:port` with `$upstream` variable + `resolver 127.0.0.11` so nginx starts cleanly when not all containers are running
-- Ollama healthcheck: switched from `curl` (not in image) to `ollama list`
-- `LLAMACPP_EXTRA_ARGS` quoting: must be quoted in `.env` to survive `source .env`
+- nginx: `proxy_pass $upstream` + `resolver 127.0.0.11` so nginx starts without all containers running
+- Ollama healthcheck: `ollama list` (no `curl` in the image)
+- `LLAMACPP_EXTRA_ARGS` must be quoted in `.env` to survive `source .env`
+- Nvidia container toolkit: `no-cgroups=true` required inside a Proxmox VM
 
 ---
 
-### Phase 2b — Llama.cpp Inference 📋
+### Phase 3 — UI & Search Services ✅
 
-**Goal:** Verify llama.cpp with a real GGUF model and confirm MTP speculative decoding.
+**Goal:** OpenWebUI and Searxng are accessible, wired to the active inference provider, and usable end-to-end.
 
-- [ ] `just download llamacpp model <hf-repo>` — GGUF downloaded to volume, `.env` updated
-- [ ] `just up llamacpp` starts the server and reaches the `/health` endpoint
-- [ ] `--spec-type draft-mtp` flag confirmed working with a Qwen3 or DeepSeek model
-- [ ] Provider switch: `just up llamacpp` while ollama running → ollama stops, llamacpp starts
-
----
-
-### Phase 3 — UI & Search Services 📋
-
-**Goal:** OpenWebUI and Searxng are accessible and wired to the active inference provider.
-
-- [ ] OpenWebUI loads at `http://localhost:8086`
-- [ ] OpenWebUI model list reflects Ollama models after download
-- [ ] OpenWebUI OpenAI-compatible mode works when switched to Llama.cpp
-- [ ] Searxng loads at `http://localhost:8888`
-- [ ] Searxng RSS/JSON output works (required for agent web-search skill)
-- [ ] `just up ollama` / `just up llamacpp` hot-switches the inference endpoint in OpenWebUI without manual reconfiguration
+- [x] OpenWebUI loads at `http://localhost:8086`
+- [x] OpenWebUI model list reflects Ollama models — `qwen3.5:9b` and `qwen3.5:localai` visible after download
+- [x] OpenWebUI chat works end-to-end via the Ollama backend (verified via `/api/chat/completions`)
+- [x] Searxng loads at `http://localhost:8888`
+- [x] Searxng JSON output works — 21 results returned for test query
+- [x] Searxng RSS output works — returns valid feed with real results
+- [x] Searxng reachable from inside the Docker network (`http://searxng:8080`) — confirmed from hermes container
+- [x] `just up ollama` sets `OLLAMA_BASE_URL=http://ollama:11434` in OpenWebUI; switching provider will recreate the container with updated env (hot-switch confirmed by env inspection)
 
 ---
 
@@ -114,13 +102,25 @@ A self-hosted AI stack running on a local GPU. Services are orchestrated via Doc
 
 - [ ] `just up comfy` starts ComfyUI with GPU passthrough
 - [ ] ComfyUI web UI loads at `http://localhost:8188`
-- [ ] Single-GPU warning is surfaced when Llama.cpp is also running
+- [ ] Single-GPU warning is surfaced when running alongside another inference provider
 - [ ] OpenDesign loads at `http://localhost:7456`
 - [ ] `OD_API_TOKEN` generation documented in setup wizard
 
 ---
 
-### Phase 7 — `just setup` Polish 📋
+### Phase 7 — Llama.cpp Inference 📋
+
+**Goal:** Verify llama.cpp with a real GGUF model and confirm MTP speculative decoding gives a meaningful speed boost over baseline.
+
+- [ ] `just download llamacpp model <hf-repo>` — GGUF downloaded to volume, `.env` updated
+- [ ] `just up llamacpp` starts the server and reaches the `/health` endpoint
+- [ ] Inference request returns a valid response via the OpenAI-compatible API
+- [ ] `--spec-type draft-mtp` flag confirmed working with a Qwen3 or DeepSeek model
+- [ ] Provider switch: `just up llamacpp` while Ollama running → Ollama stops, llamacpp starts, OpenWebUI switches over
+
+---
+
+### Phase 8 — `just setup` Polish 📋
 
 **Goal:** A new user can run `just setup` on a fresh Linux + GPU machine and be ready to chat within 10 minutes.
 
@@ -132,7 +132,7 @@ A self-hosted AI stack running on a local GPU. Services are orchestrated via Doc
 
 ---
 
-### Phase 8 — Mac & Windows Support 📋
+### Phase 9 — Mac & Windows Support 📋
 
 **Goal:** The stack runs on Mac (Apple Silicon / Intel) and Windows (WSL2) with appropriate GPU or CPU-only fallback.
 
@@ -155,3 +155,4 @@ A self-hosted AI stack running on a local GPU. Services are orchestrated via Doc
 | Agent web search | Searxng RSS/JSON | Self-hosted, no API key, works for both web and news categories |
 | Context window sizing | VRAM-tier lookup table | Simple, predictable, avoids model-specific calculations at download time |
 | `just hermes ssh` | `docker exec` | Simpler than real SSH for a local stack; functionally equivalent |
+| Llama.cpp priority | Phase 7 (after agents/UI) | Ollama covers the MVP use case; llamacpp testing requires a GGUF download |
