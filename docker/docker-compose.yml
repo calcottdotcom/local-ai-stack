@@ -24,6 +24,7 @@ services:
       - WEB_SEARCH_ENGINE=searxng
       - SEARXNG_QUERY_URL=http://searxng:8080/search?q=<query>&format=json
       - BYPASS_WEB_SEARCH_WEB_LOADER=true
+      - BYPASS_WEB_SEARCH_EMBEDDING_AND_RETRIEVAL=true
     volumes:
       - openwebui-data:/app/backend/data
     networks:
