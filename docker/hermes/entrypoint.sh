@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Configures hermes via `hermes config set` on every container start using the
-# active inference provider from env vars, then keeps the container alive.
+# active inference provider from env vars, then starts hermes-webui.
 set -euo pipefail
 
 BASE_URL="${INFERENCE_BASE_URL:-http://ollama:11434/v1}"
@@ -10,27 +10,22 @@ OLLAMA_MDL="${OLLAMA_MODEL:-$MODEL}"
 LLAMACPP_MDL="${LLAMACPP_MODEL:-}"
 CTX="${LLAMACPP_CTX:-65536}"
 
-# Map our provider names to hermes provider names
 [[ "$PROVIDER" == "llamacpp" ]] && HERMES_PROVIDER="custom" || HERMES_PROVIDER="ollama"
 
 cfg() { hermes config set "$1" "$2"; }
 
-# Active provider
 cfg model.default  "$MODEL"
 cfg model.provider "$HERMES_PROVIDER"
 cfg model.base_url "$BASE_URL"
 cfg model.api_key  ""
 [[ "$PROVIDER" == "llamacpp" ]] && cfg model.context_length "$CTX"
 
-# Ollama alias — always present so `hermes /model ollama` works even when
-# llamacpp is the active provider
 if [[ -n "$OLLAMA_MDL" ]]; then
     cfg model_aliases.ollama.model    "$OLLAMA_MDL"
     cfg model_aliases.ollama.provider "ollama"
     cfg model_aliases.ollama.base_url "http://ollama:11434/v1"
 fi
 
-# Llamacpp alias — only written when a model has been downloaded
 if [[ -n "$LLAMACPP_MDL" ]]; then
     cfg model_aliases.llamacpp.model           "$LLAMACPP_MDL"
     cfg model_aliases.llamacpp.provider        "custom"
@@ -38,8 +33,35 @@ if [[ -n "$LLAMACPP_MDL" ]]; then
     cfg model_aliases.llamacpp.context_length  "$CTX"
 fi
 
-# Use hermes's own venv Python so run_agent and all hermes deps are importable.
-HERMES_PYTHON="/home/hermes/.hermes/hermes-agent/venv/bin/python"
+# Write SOUL.md — loaded by hermes with every message, no restart needed.
+# Tells the agent how to install software that persists across container restarts.
+cat > /root/.hermes/SOUL.md << 'SOUL'
+## Environment
+
+You run inside a Docker container as root on a Linux host.
+
+## Installing software
+
+`apt-get install <pkg>` works immediately but is **lost on container restart** because it writes outside the persistent volume.
+
+To install something that **persists across restarts**:
+1. Add the package name to `/root/.hermes/apt-packages.txt` (one per line)
+2. Run `apt-get install -y <pkg>` to also use it in the current session
+
+The file is read on every container start and those packages are reinstalled automatically. You cannot modify the Dockerfile.
+
+For Python dependencies, create a venv inside your workspace (e.g. `python3 -m venv ~/workspace/project/venv`) — the workspace is on the persistent volume so packages installed there survive restarts.
+SOUL
+
+# Reinstall any packages the agent has persisted across restarts
+APT_PACKAGES=/root/.hermes/apt-packages.txt
+if [[ -f "$APT_PACKAGES" ]] && [[ -s "$APT_PACKAGES" ]]; then
+    echo "Installing persisted packages from $APT_PACKAGES..."
+    apt-get update -qq
+    xargs apt-get install -y --no-install-recommends < "$APT_PACKAGES"
+fi
+
+HERMES_PYTHON="/usr/local/lib/hermes-agent/venv/bin/python"
 
 cd /opt/hermes-webui
 exec "$HERMES_PYTHON" server.py

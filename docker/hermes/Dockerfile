@@ -20,29 +20,19 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
-# Ubuntu 24.04 ships with an 'ubuntu' user at uid 1000. Remove it so hermes
-# can take uid 1000, which matches the volume ownership on the host.
-RUN userdel -r ubuntu && useradd -m -u 1000 -s /bin/bash hermes
+WORKDIR /root
 
-USER hermes
-WORKDIR /home/hermes
-
-# Install hermes agent for this user
+# Install hermes agent as root
 RUN curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash
 
-# Ensure hermes binary is on PATH
-ENV PATH="/home/hermes/.local/bin:/home/hermes/.hermes/bin:${PATH}"
+ENV PATH="/root/.local/bin:/root/.hermes/bin:${PATH}"
 
 EXPOSE 8787
 
-# Clone hermes-webui outside /home/hermes (which is a volume mount) so the
-# venv and source survive volume attachment without being shadowed.
-USER root
-RUN git clone --depth 1 https://github.com/nesquena/hermes-webui.git /opt/hermes-webui \
-    && chown -R hermes:hermes /opt/hermes-webui
+# Clone hermes-webui outside the volume mount so it survives volume attachment
+RUN git clone --depth 1 https://github.com/nesquena/hermes-webui.git /opt/hermes-webui
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
-USER hermes
 
 CMD ["/entrypoint.sh"]
