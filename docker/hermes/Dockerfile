@@ -32,5 +32,8 @@ RUN curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash
 # Ensure hermes binary is on PATH
 ENV PATH="/home/hermes/.local/bin:/home/hermes/.hermes/bin:${PATH}"
 
-# Keep the container alive so 'docker exec -it hermes bash' works
-CMD ["sleep", "infinity"]
+# Entrypoint writes cli-config.yaml from env vars, then keeps container alive
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+CMD ["/entrypoint.sh"]

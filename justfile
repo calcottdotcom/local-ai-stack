@@ -32,6 +32,9 @@ up provider:
         sed -i "s|^INFERENCE_BASE_URL=.*|INFERENCE_BASE_URL=http://ollama:11434/v1|" .env
         sed -i "s|^OLLAMA_BASE_URL=.*|OLLAMA_BASE_URL=http://ollama:11434|"        .env
         sed -i "s|^OPENAI_API_BASE_URL=.*|OPENAI_API_BASE_URL=|"                  .env
+        # Sync active model from OLLAMA_MODEL if set
+        [[ -n "${OLLAMA_MODEL:-}" ]] && \
+            sed -i "s|^INFERENCE_MODEL=.*|INFERENCE_MODEL=${OLLAMA_MODEL}|" .env || true
         {{dc}} \
             -f {{cf}}docker-compose.yml \
             -f {{cf}}docker-compose.ollama.yml \
@@ -61,6 +64,9 @@ up provider:
         sed -i "s|^INFERENCE_BASE_URL=.*|INFERENCE_BASE_URL=http://llamacpp:8080/v1|" .env
         sed -i "s|^OLLAMA_BASE_URL=.*|OLLAMA_BASE_URL=|"                              .env
         sed -i "s|^OPENAI_API_BASE_URL=.*|OPENAI_API_BASE_URL=http://llamacpp:8080/v1|" .env
+        # Sync active model from LLAMACPP_MODEL
+        [[ -n "${LLAMACPP_MODEL:-}" ]] && \
+            sed -i "s|^INFERENCE_MODEL=.*|INFERENCE_MODEL=${LLAMACPP_MODEL}|" .env || true
         {{dc}} \
             -f {{cf}}docker-compose.yml \
             -f {{cf}}docker-compose.llamacpp.yml \

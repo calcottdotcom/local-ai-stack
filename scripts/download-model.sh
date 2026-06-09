@@ -75,6 +75,10 @@ PARAMETER num_ctx ${CTX}"
     ok "Model ready: $TAGGED_MODEL (context: $CTX tokens)"
     info "Storage: docker volume 'local-ai-stack_ollama-models'"
 
+    # Track the active model in .env so agents pick it up on next start
+    sed -i "s|^OLLAMA_MODEL=.*|OLLAMA_MODEL=${TAGGED_MODEL}|" "$ROOT_DIR/.env"
+    sed -i "s|^INFERENCE_MODEL=.*|INFERENCE_MODEL=${TAGGED_MODEL}|" "$ROOT_DIR/.env"
+
 # ─────────────────────────────────────────────────────────────────────────
 # LLAMA.CPP
 # ─────────────────────────────────────────────────────────────────────────
