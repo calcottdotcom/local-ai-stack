@@ -174,6 +174,14 @@ hermes action="ssh":
         *)   docker exec -it -u hermes hermes {{action}} ;;
     esac
 
+# Open a shell in the pi container: just pi ssh
+pi action="ssh":
+    #!/usr/bin/env bash
+    case "{{action}}" in
+        ssh) docker exec -it -u pi pi bash ;;
+        *)   docker exec -it -u pi pi {{action}} ;;
+    esac
+
 # ── Setup ──────────────────────────────────────────────────────────────────
 
 # Interactive setup wizard (or: just setup local-domains)
