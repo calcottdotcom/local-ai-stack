@@ -181,7 +181,7 @@ setup target="":
 # ── Tests (mirrors CI) ────────────────────────────────────────────────────
 
 # Run all tests — same checks as the CI workflow (lint only; for live inference test: just test-inference)
-test: test-compose test-dockerfiles test-scripts test-nginx test-justfile
+test: test-compose test-dockerfiles test-scripts test-nginx test-justfile test-vram
     @echo ""
     @echo "All tests passed."
 
@@ -256,6 +256,39 @@ test-nginx:
         -v "$PWD/config/nginx/conf.d:/etc/nginx/conf.d:ro" \
         nginx:alpine nginx -t
     echo "✓ nginx config valid"
+
+# Unit-test VRAM recommendation functions (recommend_model and recommend_ctx)
+test-vram:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    source scripts/gpu-detect.sh
+    fail=0
+    assert_eq() {
+        local desc="$1" got="$2" want="$3"
+        if [[ "$got" == "$want" ]]; then
+            echo "  ✓ $desc"
+        else
+            echo "  ✗ $desc"
+            echo "      got : $got"
+            echo "      want: $want"
+            fail=1
+        fi
+    }
+    echo "Testing recommend_model..."
+    assert_eq "24GB → gemma4:12b 128K"  "$(recommend_model 24)" "gemma4:12b (128K context with room to spare)"
+    assert_eq "15GB → gemma4:12b"        "$(recommend_model 15)" "gemma4:12b"
+    assert_eq "12GB → qwen3.5:9b"        "$(recommend_model 12)" "qwen3.5:9b"
+    assert_eq "8GB  → qwen3.5:7b"        "$(recommend_model  8)" "qwen3.5:7b"
+    assert_eq "6GB  → qwen3.5:4b"        "$(recommend_model  6)" "qwen3.5:4b (limited context — consider a smaller model)"
+    assert_eq "4GB  → CPU only"           "$(recommend_model  4)" "No GPU or too little VRAM — CPU inference only (very slow)"
+    echo "Testing recommend_ctx..."
+    assert_eq "15GB + 7GB model  → 131072" "$(recommend_ctx 15 7)"  "131072"
+    assert_eq "12GB + 5GB model  → 131072" "$(recommend_ctx 12 5)"  "131072"
+    assert_eq "12GB + 7GB model  → 65536"  "$(recommend_ctx 12 7)"  "65536"
+    assert_eq "8GB  + 4GB model  → 65536"  "$(recommend_ctx  8 4)"  "65536"
+    assert_eq "6GB  + 2GB model  → 65536"  "$(recommend_ctx  6 2)"  "65536"
+    assert_eq "4GB  + 3GB model  → 16384"  "$(recommend_ctx  4 3)"  "16384"
+    [[ $fail -eq 0 ]] && echo "✓ All VRAM tests passed" || exit 1
 
 # Check the justfile parses correctly
 test-justfile:
