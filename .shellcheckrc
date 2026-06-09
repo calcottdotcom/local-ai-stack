@@ -1,0 +1,2 @@
+# Source paths are resolved dynamically from BASH_SOURCE; shellcheck can't follow them
+disable=SC1090,SC1091

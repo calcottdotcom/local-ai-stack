@@ -155,6 +155,84 @@ setup target="":
         *)             bash scripts/setup.sh ;;
     esac
 
+# ── Tests (mirrors CI) ────────────────────────────────────────────────────
+
+# Run all tests — same checks as the CI workflow
+test: test-compose test-dockerfiles test-scripts test-nginx test-justfile
+    @echo ""
+    @echo "All tests passed."
+
+# Validate every compose file combination
+test-compose:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # Use a temp env so we never clobber the real .env
+    TMPENV=$(mktemp)
+    trap 'rm -f "$TMPENV"' EXIT
+    cp .env.example "$TMPENV"
+    sed -i "s|^OD_API_TOKEN=.*|OD_API_TOKEN=ci-test-$(openssl rand -hex 8)|" "$TMPENV"
+
+    check() {
+        echo "  → $*"
+        docker compose --env-file "$TMPENV" "$@" config --quiet
+    }
+
+    echo "Validating compose files..."
+    check -f docker-compose.yml -f docker-compose.ollama.yml   -f docker-compose.gpu-nvidia-ollama.yml
+    check -f docker-compose.yml -f docker-compose.ollama.yml   -f docker-compose.gpu-amd-ollama.yml
+    check -f docker-compose.yml -f docker-compose.llamacpp.yml -f docker-compose.gpu-nvidia-llamacpp.yml
+    check -f docker-compose.yml -f docker-compose.llamacpp.yml -f docker-compose.gpu-amd-llamacpp.yml
+    check -f docker-compose.yml -f docker-compose.comfy.yml    -f docker-compose.gpu-nvidia-comfy.yml
+    check -f docker-compose.yml -f docker-compose.comfy.yml    -f docker-compose.gpu-amd-comfy.yml
+    echo "✓ All compose files valid"
+
+# Lint all Dockerfiles with hadolint (runs via Docker — no local install needed)
+test-dockerfiles:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "Linting Dockerfiles..."
+    for df in docker/*/Dockerfile; do
+        echo "  → $df"
+        docker run --rm -i \
+            -v "$PWD/.hadolint.yaml:/.config/hadolint.yaml:ro" \
+            hadolint/hadolint hadolint \
+            --config /.config/hadolint.yaml \
+            - < "$df"
+    done
+    echo "✓ All Dockerfiles pass hadolint"
+
+# Lint all shell scripts with shellcheck (runs via Docker — no local install needed)
+test-scripts:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "Linting shell scripts..."
+    docker run --rm \
+        -v "$PWD:/mnt:ro" \
+        koalaman/shellcheck:stable \
+        --rcfile /mnt/.shellcheckrc \
+        /mnt/scripts/*.sh \
+        /mnt/docker/ubuntu-server/entrypoint.sh
+    echo "✓ All scripts pass shellcheck"
+
+# Test nginx config syntax
+test-nginx:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "Testing nginx config syntax..."
+    docker run --rm \
+        -v "$PWD/config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro" \
+        -v "$PWD/config/nginx/conf.d:/etc/nginx/conf.d:ro" \
+        nginx:alpine nginx -t
+    echo "✓ nginx config valid"
+
+# Check the justfile parses correctly
+test-justfile:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "Checking justfile..."
+    just --list > /dev/null
+    echo "✓ justfile parses correctly"
+
 # ── GPU utilities ──────────────────────────────────────────────────────────
 
 # Check GPU status
