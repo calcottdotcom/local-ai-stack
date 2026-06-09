@@ -83,8 +83,11 @@ A self-hosted AI stack running on a local GPU. Services are orchestrated via Doc
 - [x] Pi coding agent starts and connects to the inference endpoint
 - [x] Ubuntu server sandbox starts with SSH and nginx accessible
 
-**Fix discovered during live testing:**
+**Fixes discovered during live testing:**
 - `just hermes ssh` must use `-u hermes` flag so the shell runs as the hermes user with the correct `$PATH`; defaulting to root misses the user-local install paths
+- Ubuntu 24.04 base image ships an `ubuntu` user at uid 1000, pushing hermes to uid 1001. Docker volume init writes files owned by uid 1000, so hermes (1001) gets Permission denied on `drwxr-x---`. Fixed by removing the ubuntu user in the Dockerfile so hermes claims uid 1000.
+- Agent containers started before `just download` complete have a stale `INFERENCE_MODEL` env var. Fixed by having `download-model.sh` restart running agent containers after updating `.env`.
+- Pi coding agent uses `~/.pi/agent/models.json` (not env vars alone) to override the provider base URL. Entrypoint writes both `models.json` and `settings.json` on every start.
 
 ---
 
