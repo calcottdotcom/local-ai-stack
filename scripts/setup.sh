@@ -108,7 +108,8 @@ DOWNLOAD_NOW=${DOWNLOAD_NOW:-Y}
 
 if [[ "$DOWNLOAD_NOW" =~ ^[Yy]$ ]]; then
     if [[ "$PROVIDER" == "ollama" ]]; then
-        if   (( VRAM_GB >= 12 )); then DEFAULT_MODEL="qwen3.5:9b"
+        if   (( VRAM_GB >= 15 )); then DEFAULT_MODEL="gemma4:12b"
+        elif (( VRAM_GB >= 12 )); then DEFAULT_MODEL="qwen3.5:9b"
         elif (( VRAM_GB >=  8 )); then DEFAULT_MODEL="qwen3.5:7b"
         else                           DEFAULT_MODEL="qwen3.5:4b"
         fi

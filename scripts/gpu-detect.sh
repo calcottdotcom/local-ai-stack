@@ -30,7 +30,8 @@ detect_gpu() {
 
 recommend_model() {
     local vram_gb=$1
-    if   (( vram_gb >= 24 )); then echo "gemma4:12b or qwen3.5:9b (you have headroom for large context)"
+    if   (( vram_gb >= 24 )); then echo "gemma4:12b (128K context with room to spare)"
+    elif (( vram_gb >= 15 )); then echo "gemma4:12b"
     elif (( vram_gb >= 12 )); then echo "qwen3.5:9b"
     elif (( vram_gb >=  8 )); then echo "qwen3.5:7b"
     elif (( vram_gb >=  6 )); then echo "qwen3.5:4b (limited context — consider a smaller model)"
@@ -41,11 +42,11 @@ recommend_model() {
 recommend_ctx() {
     local vram_gb=$1 model_size_gb=${2:-5}
     local free=$(( vram_gb - model_size_gb ))
-    if   (( free >= 16 )); then echo 131072
-    elif (( free >= 8  )); then echo 65536
-    elif (( free >= 4  )); then echo 32768
-    elif (( free >= 2  )); then echo 8192
-    else                        echo 4096
+    if   (( free >= 6 )); then echo 131072
+    elif (( free >= 3 )); then echo 65536
+    elif (( free >= 2 )); then echo 32768
+    elif (( free >= 1 )); then echo 16384
+    else                       echo 8192
     fi
 }
 
