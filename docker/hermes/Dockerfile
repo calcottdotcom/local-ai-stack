@@ -33,7 +33,9 @@ RUN curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash
 ENV PATH="/home/hermes/.local/bin:/home/hermes/.hermes/bin:${PATH}"
 
 # Entrypoint writes cli-config.yaml from env vars, then keeps container alive
+USER root
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
+USER hermes
 
 CMD ["/entrypoint.sh"]
