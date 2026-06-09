@@ -39,13 +39,32 @@ A self-hosted AI stack running on a local GPU. Services are orchestrated via Doc
 - [x] `just test-inference` and CI smoke test prove Ollama starts and serves requests (CPU mode)
 - [x] MTP flag corrected to `--spec-type draft-mtp`; controlled via `LLAMACPP_EXTRA_ARGS` in `.env`
 - [x] `just download` idempotent — skips re-pull/re-download if model already present
-- [ ] Boot test: `just up ollama` starts without errors on a Linux/Nvidia machine
-- [ ] Boot test: `just up llamacpp` starts without errors on a Linux/Nvidia machine
-- [ ] `just download ollama model qwen3.5:9b` — pull succeeds and Modelfile is applied
-- [ ] `just download llamacpp model <hf-repo>` — GGUF downloaded, model set in `.env`
-- [ ] Provider switch interlock: switching from ollama → llamacpp stops ollama container
-- [ ] VRAM-based context sizing produces sensible values across the 6/8/12/24 GB tiers
-- [ ] `--spec-type draft-mtp` verified against a model that supports it (Qwen3/DeepSeek)
+- [x] Boot test: `just up ollama` starts without errors on Linux/Nvidia (RTX 5060 Ti, Ubuntu 24.04)
+- [x] `just download ollama model qwen3.5:9b` — pull succeeds and Modelfile applied (65536 ctx for 15GB VRAM)
+- [x] GPU inference: **55.7 tok/s** on 9B model, 9GB VRAM utilisation on RTX 5060 Ti
+- [x] VRAM-based context sizing verified: 15GB / ~6GB model → 65536 tokens
+- [x] Provider switch interlock: `just up llamacpp` stops ollama before starting (confirmed)
+- [x] `just gpucheck` works on Linux/Nvidia
+- [ ] Boot test: `just up llamacpp` — deferred (see Phase 2b below)
+- [ ] `just download llamacpp model <hf-repo>` — deferred
+- [ ] `--spec-type draft-mtp` verified against a model that supports it — deferred
+
+**Also fixed during Phase 2 testing:**
+- Build context paths: `./hermes` → `./docker/hermes` (required by `--project-directory .`)
+- nginx: replaced `proxy_pass http://host:port` with `$upstream` variable + `resolver 127.0.0.11` so nginx starts cleanly when not all containers are running
+- Ollama healthcheck: switched from `curl` (not in image) to `ollama list`
+- `LLAMACPP_EXTRA_ARGS` quoting: must be quoted in `.env` to survive `source .env`
+
+---
+
+### Phase 2b — Llama.cpp Inference 📋
+
+**Goal:** Verify llama.cpp with a real GGUF model and confirm MTP speculative decoding.
+
+- [ ] `just download llamacpp model <hf-repo>` — GGUF downloaded to volume, `.env` updated
+- [ ] `just up llamacpp` starts the server and reaches the `/health` endpoint
+- [ ] `--spec-type draft-mtp` flag confirmed working with a Qwen3 or DeepSeek model
+- [ ] Provider switch: `just up llamacpp` while ollama running → ollama stops, llamacpp starts
 
 ---
 
