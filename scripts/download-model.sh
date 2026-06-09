@@ -83,6 +83,14 @@ PARAMETER num_ctx ${CTX}"
     sed -i "s|^OLLAMA_MODEL=.*|OLLAMA_MODEL=${TAGGED_MODEL}|" "$ROOT_DIR/.env"
     sed -i "s|^INFERENCE_MODEL=.*|INFERENCE_MODEL=${TAGGED_MODEL}|" "$ROOT_DIR/.env"
 
+    # Restart running agent containers so they pick up the new model immediately
+    for agent in hermes pi; do
+        if docker ps -q --filter name="^${agent}$" | grep -q .; then
+            info "Restarting ${agent} to pick up new model..."
+            docker restart "$agent" > /dev/null
+        fi
+    done
+
 # ─────────────────────────────────────────────────────────────────────────
 # LLAMA.CPP
 # ─────────────────────────────────────────────────────────────────────────
