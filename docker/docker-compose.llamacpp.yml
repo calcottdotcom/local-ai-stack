@@ -17,7 +17,13 @@ services:
       --port 8080
       --ctx-size ${LLAMACPP_CTX:-8192}
       --n-gpu-layers ${LLAMACPP_GPU_LAYERS:-99}
-      --mtp
+      ${LLAMACPP_EXTRA_ARGS:-}
     networks:
       - local-ai-net
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 60s

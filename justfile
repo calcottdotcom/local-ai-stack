@@ -37,6 +37,15 @@ up provider:
             -f {{cf}}docker-compose.ollama.yml \
             -f "{{cf}}docker-compose.gpu-${GPU}-ollama.yml" \
             up -d
+        PORT="${OLLAMA_PORT:-11435}"
+        echo "Waiting for Ollama to be ready..."
+        for i in $(seq 1 45); do
+            if curl -sf "http://localhost:${PORT}/api/tags" > /dev/null 2>&1; then
+                echo "✓ Ollama ready — http://localhost:${PORT}"
+                break
+            fi
+            [[ $i -lt 45 ]] && sleep 2 || echo "! Ollama still starting — check: just logs ollama"
+        done
         ;;
     llamacpp)
         [[ -n "${LLAMACPP_MODEL:-}" ]] || {
@@ -57,6 +66,16 @@ up provider:
             -f {{cf}}docker-compose.llamacpp.yml \
             -f "{{cf}}docker-compose.gpu-${GPU}-llamacpp.yml" \
             up -d
+        PORT="${LLAMACPP_PORT:-8089}"
+        echo "Waiting for Llama.cpp to load model (this can take several minutes)..."
+        for i in $(seq 1 150); do
+            HTTP_STATUS=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:${PORT}/health" 2>/dev/null || echo "000")
+            if [[ "$HTTP_STATUS" == "200" ]]; then
+                echo "✓ Llama.cpp ready — http://localhost:${PORT}"
+                break
+            fi
+            [[ $i -lt 150 ]] && sleep 2 || echo "! Llama.cpp still loading after 5m — check: just logs llamacpp"
+        done
         ;;
     comfy)
         echo "Note: ComfyUI uses the GPU. If running alongside llamacpp on a single GPU, VRAM will be shared."
@@ -161,7 +180,7 @@ setup target="":
 
 # ── Tests (mirrors CI) ────────────────────────────────────────────────────
 
-# Run all tests — same checks as the CI workflow
+# Run all tests — same checks as the CI workflow (lint only; for live inference test: just test-inference)
 test: test-compose test-dockerfiles test-scripts test-nginx test-justfile
     @echo ""
     @echo "All tests passed."
@@ -230,19 +249,11 @@ test-nginx:
     #!/usr/bin/env bash
     set -euo pipefail
     echo "Testing nginx config syntax..."
-    # nginx resolves proxy_pass hostnames during 'nginx -t', so we stub them
-    # with --add-host to allow the syntax check without a running stack.
+    # proxy_pass uses $upstream variables so nginx defers DNS resolution to
+    # request time — no --add-host stubs needed for the syntax check.
     docker run --rm \
         -v "$PWD/config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro" \
         -v "$PWD/config/nginx/conf.d:/etc/nginx/conf.d:ro" \
-        --add-host openwebui:127.0.0.1 \
-        --add-host ollama:127.0.0.1 \
-        --add-host llamacpp:127.0.0.1 \
-        --add-host searxng:127.0.0.1 \
-        --add-host hermes-webui:127.0.0.1 \
-        --add-host ubuntu-server:127.0.0.1 \
-        --add-host comfyui:127.0.0.1 \
-        --add-host opendesign:127.0.0.1 \
         nginx:alpine nginx -t
     echo "✓ nginx config valid"
 
@@ -253,6 +264,47 @@ test-justfile:
     echo "Checking justfile..."
     just --list > /dev/null
     echo "✓ justfile parses correctly"
+
+# Live smoke test: starts Ollama (CPU mode), verifies the health endpoint, stops it.
+# Safe to run when a stack is already up — reuses the existing container if running.
+test-inference:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    PORT=11435
+    STARTED=false
+    TMPENV=$(mktemp)
+    trap 'rm -f "$TMPENV"; if [[ "$STARTED" == "true" ]]; then docker stop ollama 2>/dev/null || true; docker rm ollama 2>/dev/null || true; fi' EXIT
+
+    if docker ps -q --filter name=ollama | grep -q .; then
+        echo "Using running Ollama container..."
+    else
+        echo "Starting Ollama (CPU mode — no GPU overlay)..."
+        grep -v '^OD_API_TOKEN=' .env.example > "$TMPENV"
+        echo "OD_API_TOKEN=ci-test-$(openssl rand -hex 8)" >> "$TMPENV"
+        {{dc}} --env-file "$TMPENV" \
+            -f {{cf}}docker-compose.yml \
+            -f {{cf}}docker-compose.ollama.yml \
+            up -d ollama
+        STARTED=true
+    fi
+
+    echo "Waiting for Ollama health endpoint..."
+    for i in $(seq 1 60); do
+        if curl -sf "http://localhost:${PORT}/api/tags" > /dev/null 2>&1; then
+            echo "  Ollama ready (${i}s)"
+            break
+        fi
+        if [[ $i -eq 60 ]]; then
+            echo "  Ollama did not respond within 120s"
+            docker logs ollama 2>&1 | tail -20
+            exit 1
+        fi
+        sleep 2
+    done
+
+    echo "Checking API response..."
+    curl -sf "http://localhost:${PORT}/api/tags" | python3 -m json.tool
+    echo "✓ Inference smoke test passed"
 
 # ── GPU utilities ──────────────────────────────────────────────────────────
 
