@@ -67,7 +67,38 @@ just setup
 
 ### macOS
 
-macOS support is in progress. Docker Desktop + Homebrew (`brew install just`) is the intended path; Apple Silicon GPU passthrough via Ollama's Metal backend is planned.
+On macOS, Ollama runs **natively on the host** (not in Docker) so it can use Metal GPU acceleration. Docker containers connect to it via `host.docker.internal`.
+
+**Step 1 — Install Docker Desktop for Mac:**  
+[https://docs.docker.com/desktop/setup/install/mac-install/](https://docs.docker.com/desktop/setup/install/mac-install/)
+
+**Step 2 — Install `just` and Ollama:**
+```bash
+brew install just
+brew install ollama
+```
+Or install Ollama from [https://ollama.com/download/mac](https://ollama.com/download/mac) (menu bar app).
+
+**Step 3 — Start Ollama** (if using the menu bar app, just open it; if using Homebrew, run `ollama serve`).
+
+**Step 4 — Clone and run:**
+```bash
+git clone https://github.com/calcottdotcom/local-ai-stack.git
+cd local-ai-stack
+just setup
+```
+
+The setup wizard detects macOS, estimates usable RAM for model sizing (40% of total — conservative for OS + Docker overhead), and skips the provider selection (Ollama only on Mac). It will recommend a model appropriate for your RAM:
+
+| Total RAM | Recommended model |
+|-----------|------------------|
+| 24 GB+    | gemma4:12b (128K context) |
+| 16 GB     | gemma4:12b |
+| 12 GB     | qwen3.5:9b |
+| 8 GB      | qwen3.5:7b |
+| < 8 GB    | qwen3.5:4b |
+
+> **Note:** Llama.cpp and ComfyUI are not supported on macOS — `just up ollama` is the only inference path.
 
 ## Getting started
 ### Setup

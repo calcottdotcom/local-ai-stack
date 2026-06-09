@@ -91,16 +91,27 @@ A self-hosted AI stack running on a local GPU. Services are orchestrated via Doc
 
 ---
 
-### Phase 5 — Mac & Windows Support 📋
+### Phase 5 — Mac & Windows Support 🔄
 
 **Goal:** The stack runs on Mac (Apple Silicon / Intel) and Windows (WSL2) with appropriate GPU or CPU-only fallback.
 
-- [ ] Determine GPU passthrough approach for Mac (Metal via Ollama's native support)
-- [ ] Determine GPU passthrough approach for Windows (WSL2 + Nvidia)
-- [ ] OS detection in `just setup` and `scripts/gpu-detect.sh`
-- [ ] Compose GPU overlays for Mac/Windows variants where needed
-- [ ] `sed -i` portability fixed for macOS (`sed -i ''`)
-- [ ] README updated with Mac/Windows instructions
+**macOS:**
+- [x] Ollama runs natively on host (Metal acceleration); Docker containers use `host.docker.internal:11434`
+- [x] `detect_platform()` in `gpu-detect.sh` returns `mac`; `detect_gpu()` uses `sysctl hw.memsize` (40% RAM estimate)
+- [x] `sedi()` helper in `gpu-detect.sh` — BSD `sed -i ''` on Mac, GNU `sed -i` elsewhere
+- [x] `just setup` on Mac: checks Ollama CLI, skips provider selection, sets `host.docker.internal` URLs in `.env`
+- [x] `just up ollama` on Mac: skips ollama/GPU overlays, starts base compose only, waits on host port 11434
+- [x] `just up llamacpp` / `just up comfy` on Mac: exits with clear unsupported message
+- [x] `just down/restart/logs` on Mac: skips provider/GPU overlays for ollama
+- [x] `just download ollama model` on Mac: uses native `ollama pull/create` on host (no `docker exec`)
+- [x] All `sed -i` calls in `justfile` and `download-model.sh` replaced with `sedi`
+- [x] README macOS section: full install guide, RAM-tier model table, host-Ollama explanation
+
+**Windows (WSL2):**
+- [x] `detect_platform()` returns `wsl` when `/proc/version` contains "microsoft" or "wsl"
+- [x] `just setup` shows WSL2-specific install instructions for docker and just
+- [x] README Windows section: 5-step guide (WSL2 enable, Docker Desktop, just, Nvidia drivers, clone & run)
+- [ ] End-to-end test on a real Windows machine (WSL2 + Docker Desktop)
 
 ---
 
