@@ -42,11 +42,10 @@ recommend_model() {
 recommend_ctx() {
     local vram_gb=$1 model_size_gb=${2:-5}
     local free=$(( vram_gb - model_size_gb ))
-    if   (( free >= 16 )); then echo 131072
-    elif (( free >= 8  )); then echo 65536
-    elif (( free >= 4  )); then echo 32768
-    elif (( free >= 2  )); then echo 8192
-    else                        echo 4096
+    if   (( free >= 6 )); then echo 131072
+    elif (( free >= 3 )); then echo 65536
+    elif (( free >= 1 )); then echo 32768
+    else                       echo 8192
     fi
 }
 

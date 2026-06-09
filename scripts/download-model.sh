@@ -46,14 +46,14 @@ if [[ "$PROVIDER" == "ollama" ]]; then
     ok "Model pulled"
 
     # Estimate model size from name to calculate available VRAM for context
-    if   echo "$MODEL" | grep -qi '70b\|72b'; then MODEL_SIZE_GB=42
-    elif echo "$MODEL" | grep -qi '30b\|32b\|34b'; then MODEL_SIZE_GB=20
+    if   echo "$MODEL" | grep -qi '70b\|72b'; then MODEL_SIZE_GB=40
+    elif echo "$MODEL" | grep -qi '30b\|32b\|34b'; then MODEL_SIZE_GB=19
     elif echo "$MODEL" | grep -qi '13b\|14b'; then MODEL_SIZE_GB=8
-    elif echo "$MODEL" | grep -qi '12b'; then MODEL_SIZE_GB=8
-    elif echo "$MODEL" | grep -qi '9b'; then MODEL_SIZE_GB=6
-    elif echo "$MODEL" | grep -qi '7b\|8b'; then MODEL_SIZE_GB=5
-    elif echo "$MODEL" | grep -qi '4b\|3b'; then MODEL_SIZE_GB=3
-    else MODEL_SIZE_GB=5
+    elif echo "$MODEL" | grep -qi '12b'; then MODEL_SIZE_GB=7
+    elif echo "$MODEL" | grep -qi '9b'; then MODEL_SIZE_GB=5
+    elif echo "$MODEL" | grep -qi '7b\|8b'; then MODEL_SIZE_GB=4
+    elif echo "$MODEL" | grep -qi '4b\|3b'; then MODEL_SIZE_GB=2
+    else MODEL_SIZE_GB=4
     fi
 
     CTX=$(recommend_ctx "$VRAM_GB" "$MODEL_SIZE_GB")
@@ -148,10 +148,13 @@ else:
     info "Storage: docker volume 'local-ai-stack_llamacpp-models'"
 
     # Calculate context window
-    if   echo "$GGUF_FILENAME" | grep -qi '70b\|72b'; then MODEL_SIZE_GB=42
-    elif echo "$GGUF_FILENAME" | grep -qi '12b\|13b\|14b'; then MODEL_SIZE_GB=8
-    elif echo "$GGUF_FILENAME" | grep -qi '7b\|8b\|9b'; then MODEL_SIZE_GB=5
-    else MODEL_SIZE_GB=5
+    if   echo "$GGUF_FILENAME" | grep -qi '70b\|72b'; then MODEL_SIZE_GB=40
+    elif echo "$GGUF_FILENAME" | grep -qi '30b\|32b\|34b'; then MODEL_SIZE_GB=19
+    elif echo "$GGUF_FILENAME" | grep -qi '12b\|13b\|14b'; then MODEL_SIZE_GB=7
+    elif echo "$GGUF_FILENAME" | grep -qi '9b'; then MODEL_SIZE_GB=5
+    elif echo "$GGUF_FILENAME" | grep -qi '7b\|8b'; then MODEL_SIZE_GB=4
+    elif echo "$GGUF_FILENAME" | grep -qi '4b\|3b'; then MODEL_SIZE_GB=2
+    else MODEL_SIZE_GB=4
     fi
 
     CTX=$(recommend_ctx "$VRAM_GB" "$MODEL_SIZE_GB")
