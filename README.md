@@ -32,37 +32,54 @@ sudo apt install just        # Ubuntu/Debian
 
 ### Windows (WSL2)
 
-WSL2 lets you run the full stack inside a Linux environment on Windows. Docker Desktop handles the container runtime and GPU passthrough.
+The stack runs inside WSL2 (a Linux environment built into Windows). Docker Desktop runs as a Windows app and shares itself with WSL2 — you don't install Docker inside WSL, and you don't run commands in PowerShell. Everything below happens in your **Ubuntu/WSL terminal**.
 
 **Step 1 — Enable WSL2** (skip if already done):
 ```powershell
-# Run in PowerShell as Administrator
+# Run in PowerShell as Administrator, then restart when prompted
 wsl --install
-# Restart when prompted, then open the Ubuntu app to finish setup
 ```
+After the restart, open the **Ubuntu** app from the Start menu and complete the Linux user setup.
 
-**Step 2 — Install Docker Desktop for Windows:**
+**Step 2 — Install Docker Desktop for Windows:**  
 [https://docs.docker.com/desktop/setup/install/windows-install/](https://docs.docker.com/desktop/setup/install/windows-install/)
 
-In Docker Desktop → Settings → General: enable **"Use WSL 2 based engine"**.  
-In Docker Desktop → Settings → Resources → WSL Integration: enable your Ubuntu distro.
+Once installed, open Docker Desktop and configure two settings:
+- **Settings → General**: confirm **"Use the WSL 2 based engine"** is ticked
+- **Settings → Resources → WSL Integration**: enable the toggle for your **Ubuntu** distro
 
-**Step 3 — Install `just` inside WSL** (open the Ubuntu/WSL terminal):
+Verify Docker is accessible from WSL by opening your Ubuntu terminal and running:
+```bash
+docker --version   # should print a version number, not "command not found"
+```
+
+**Step 3 — Install `just`** (in your Ubuntu/WSL terminal):
 ```bash
 sudo apt install just
 ```
 
-**Step 4 — Nvidia GPU passthrough** (skip if no Nvidia GPU):  
-Install the [Nvidia CUDA drivers for WSL](https://developer.nvidia.com/cuda/wsl) on Windows (not inside WSL — the Windows driver is sufficient). Verify with `nvidia-smi` inside WSL.
+**Step 4 — Nvidia GPU passthrough** (skip if no Nvidia GPU):
 
-**Step 5 — Clone and run:**
+Your existing game-ready drivers on Windows already include everything needed — no separate CUDA or WSL driver install is required. Docker Desktop handles GPU passthrough to containers automatically via the WSL2 backend.
+
+Verify your GPU is visible from WSL:
+```bash
+nvidia-smi   # should show your GPU and driver version
+```
+Then verify it works inside Docker:
+```bash
+docker run --rm --gpus all nvidia/cuda:12.0-base-ubuntu22.04 nvidia-smi
+```
+If both work, GPU acceleration is ready for the stack.
+
+**Step 5 — Clone and run** (in your Ubuntu/WSL terminal):
 ```bash
 git clone https://github.com/calcottdotcom/local-ai-stack.git
 cd local-ai-stack
 just setup
 ```
 
-> All commands run inside your WSL terminal. The stack itself runs in Docker — no Linux knowledge required beyond the above.
+> **Important:** all `just` commands must be run from your **Ubuntu/WSL terminal**, not PowerShell or CMD. The justfile uses bash. If you open a new terminal, make sure you're in the Ubuntu app (or Windows Terminal with the Ubuntu profile selected), not a Windows shell.
 
 ### macOS
 
