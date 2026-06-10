@@ -66,11 +66,7 @@ Verify your GPU is visible from WSL:
 ```bash
 nvidia-smi   # should show your GPU and driver version
 ```
-Then verify it works inside Docker:
-```bash
-docker run --rm --gpus all nvidia/cuda:12.0-base-ubuntu22.04 nvidia-smi
-```
-If both work, GPU acceleration is ready for the stack.
+If that works, you're done — the stack's compose files handle GPU passthrough automatically, no extra flags needed.
 
 **Step 5 — Clone and run** (in your Ubuntu/WSL terminal):
 ```bash
