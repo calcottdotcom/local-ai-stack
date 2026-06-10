@@ -175,6 +175,47 @@ logs service="":
         {{dc}} "${compose_args[@]}" logs -f {{service}}
     fi
 
+# Rebuild one or all custom images: just build | just build hermes
+build service="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    source .env 2>/dev/null || true
+    source scripts/gpu-detect.sh
+    GPU="${GPU_TYPE:-nvidia}"
+    PROVIDER="${INFERENCE_PROVIDER:-ollama}"
+    compose_args=(-f {{cf}}docker-compose.yml)
+    if [[ "$PLATFORM" != "mac" || "$PROVIDER" != "ollama" ]]; then
+        compose_args+=(-f "{{cf}}docker-compose.${PROVIDER}.yml" -f "{{cf}}docker-compose.gpu-${GPU}-${PROVIDER}.yml")
+    fi
+    if [[ -n "{{service}}" ]]; then
+        echo "Building {{service}}..."
+        {{dc}} "${compose_args[@]}" build {{service}}
+    else
+        echo "Building all custom images..."
+        {{dc}} "${compose_args[@]}" build
+    fi
+
+# Pull latest code, rebuild images, and restart the running stack
+update:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    [[ -f .env ]] || { echo "Run 'just setup' first"; exit 1; }
+    source .env
+    source scripts/gpu-detect.sh
+    GPU="${GPU_TYPE:-nvidia}"
+    PROVIDER="${INFERENCE_PROVIDER:-ollama}"
+    compose_args=(-f {{cf}}docker-compose.yml)
+    if [[ "$PLATFORM" != "mac" || "$PROVIDER" != "ollama" ]]; then
+        compose_args+=(-f "{{cf}}docker-compose.${PROVIDER}.yml" -f "{{cf}}docker-compose.gpu-${GPU}-${PROVIDER}.yml")
+    fi
+    echo "Pulling latest code..."
+    git pull
+    echo "Rebuilding images..."
+    {{dc}} "${compose_args[@]}" build
+    echo "Restarting stack..."
+    {{dc}} "${compose_args[@]}" up -d --remove-orphans
+    echo "Done — stack updated and restarted."
+
 # ── Model management ───────────────────────────────────────────────────────
 
 # Download a model: just download ollama model qwen3.5:9b
