@@ -181,7 +181,7 @@ _draw_pick() {
 }
 
 pick_from_list() {
-    local sel=0 len=${#_PICK_OPTIONS[@]} key k2 k3
+    local sel=0 len=${#_PICK_OPTIONS[@]} key k2 k3 i
 
     # Non-interactive fallback (CI / piped input)
     if [[ ! -t 0 ]]; then
@@ -190,14 +190,11 @@ pick_from_list() {
     fi
 
     tput civis 2>/dev/null || true
-    tput sc    2>/dev/null || true  # save cursor position before first draw
     _draw_pick "$sel"
 
     while true; do
         IFS= read -rsn1 key
         if [[ "$key" == $'\x1b' ]]; then
-            # Read the two-char suffix one byte at a time — avoids macOS timing
-            # issues where read -n2 returns only the first byte before timeout
             IFS= read -rsn1 -t 1 k2 || k2=""
             IFS= read -rsn1 -t 1 k3 || k3=""
             case "${k2}${k3}" in
@@ -207,8 +204,10 @@ pick_from_list() {
         elif [[ -z "$key" ]]; then
             break
         fi
-        tput rc 2>/dev/null || true  # restore saved cursor position
-        tput ed 2>/dev/null || true  # clear to end of screen
+        # Walk up one line and erase it for each menu item — no tput/TERM needed
+        for (( i=0; i<len; i++ )); do
+            printf '\033[A\033[2K'
+        done
         _draw_pick "$sel"
     done
 
