@@ -227,11 +227,11 @@ echo ""
 
 if [[ "$PROVIDER" == "ollama" ]]; then
     _PICK_OPTIONS=()
-    if   (( VRAM_GB >= 15 )); then
+    if   (( VRAM_GB >= 12 )); then
         _PICK_OPTIONS=("gemma4:12b" "qwen3.5:9b" "qwen3.5:7b" "qwen3.5:4b")
-    elif (( VRAM_GB >= 12 )); then
+    elif (( VRAM_GB >= 9 )); then
         _PICK_OPTIONS=("qwen3.5:9b" "gemma4:12b" "qwen3.5:7b" "qwen3.5:4b")
-    elif (( VRAM_GB >= 8 )); then
+    elif (( VRAM_GB >= 6 )); then
         _PICK_OPTIONS=("qwen3.5:7b" "qwen3.5:9b" "qwen3.5:4b")
     else
         _PICK_OPTIONS=("qwen3.5:4b" "qwen3.5:7b")
