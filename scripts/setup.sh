@@ -181,7 +181,7 @@ _draw_pick() {
 }
 
 pick_from_list() {
-    local sel=0 len=${#_PICK_OPTIONS[@]} key esc
+    local sel=0 len=${#_PICK_OPTIONS[@]} key k2 k3
 
     # Non-interactive fallback (CI / piped input)
     if [[ ! -t 0 ]]; then
@@ -190,20 +190,25 @@ pick_from_list() {
     fi
 
     tput civis 2>/dev/null || true
+    tput sc    2>/dev/null || true  # save cursor position before first draw
     _draw_pick "$sel"
 
     while true; do
         IFS= read -rsn1 key
         if [[ "$key" == $'\x1b' ]]; then
-            IFS= read -rsn2 -t 0.1 esc || esc=""
-            case "$esc" in
+            # Read the two-char suffix one byte at a time — avoids macOS timing
+            # issues where read -n2 returns only the first byte before timeout
+            IFS= read -rsn1 -t 0.1 k2 || k2=""
+            IFS= read -rsn1 -t 0.1 k3 || k3=""
+            case "${k2}${k3}" in
                 '[A') if [[ $sel -gt 0 ]]; then sel=$(( sel - 1 )); fi ;;
                 '[B') if [[ $sel -lt $(( len - 1 )) ]]; then sel=$(( sel + 1 )); fi ;;
             esac
         elif [[ -z "$key" ]]; then
             break
         fi
-        printf '\033[%dA\033[J' "$len"
+        tput rc 2>/dev/null || true  # restore saved cursor position
+        tput ed 2>/dev/null || true  # clear to end of screen
         _draw_pick "$sel"
     done
 
