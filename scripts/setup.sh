@@ -198,8 +198,8 @@ pick_from_list() {
         if [[ "$key" == $'\x1b' ]]; then
             # Read the two-char suffix one byte at a time — avoids macOS timing
             # issues where read -n2 returns only the first byte before timeout
-            IFS= read -rsn1 -t 0.1 k2 || k2=""
-            IFS= read -rsn1 -t 0.1 k3 || k3=""
+            IFS= read -rsn1 -t 1 k2 || k2=""
+            IFS= read -rsn1 -t 1 k3 || k3=""
             case "${k2}${k3}" in
                 '[A') if [[ $sel -gt 0 ]]; then sel=$(( sel - 1 )); fi ;;
                 '[B') if [[ $sel -lt $(( len - 1 )) ]]; then sel=$(( sel + 1 )); fi ;;
