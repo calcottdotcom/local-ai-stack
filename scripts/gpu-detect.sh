@@ -68,10 +68,10 @@ detect_gpu() {
 recommend_model() {
     local vram_gb=$1
     if   (( vram_gb >= 24 )); then echo "gemma4:12b (128K context with room to spare)"
-    elif (( vram_gb >= 15 )); then echo "gemma4:12b"
-    elif (( vram_gb >= 12 )); then echo "qwen3.5:9b"
-    elif (( vram_gb >=  8 )); then echo "qwen3.5:7b"
-    elif (( vram_gb >=  6 )); then echo "qwen3.5:4b (limited context — consider a smaller model)"
+    elif (( vram_gb >= 12 )); then echo "gemma4:12b"
+    elif (( vram_gb >=  9 )); then echo "qwen3.5:9b"
+    elif (( vram_gb >=  6 )); then echo "qwen3.5:7b"
+    elif (( vram_gb >=  4 )); then echo "qwen3.5:4b (limited context — consider a smaller model)"
     else                            echo "No GPU or too little VRAM — CPU inference only (very slow)"
     fi
 }
