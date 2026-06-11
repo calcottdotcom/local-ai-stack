@@ -19,38 +19,66 @@ up provider:
     set -euo pipefail
     [[ -f .env ]] || { echo "Run 'just setup' first to initialise .env"; exit 1; }
     source .env
+    source scripts/gpu-detect.sh
     GPU="${GPU_TYPE:-nvidia}"
 
     case "{{provider}}" in
     ollama)
         if [[ -n "$(docker ps -q --filter name=llamacpp 2>/dev/null)" ]]; then
             echo "Stopping llamacpp before starting ollama..."
-            {{dc}} -f {{cf}}docker-compose.yml -f {{cf}}docker-compose.llamacpp.yml \
-                -f "{{cf}}docker-compose.gpu-${GPU}-llamacpp.yml" down llamacpp 2>/dev/null || true
-        fi
-        sed -i "s|^INFERENCE_PROVIDER=.*|INFERENCE_PROVIDER=ollama|"              .env
-        sed -i "s|^INFERENCE_BASE_URL=.*|INFERENCE_BASE_URL=http://ollama:11434/v1|" .env
-        sed -i "s|^OLLAMA_BASE_URL=.*|OLLAMA_BASE_URL=http://ollama:11434|"        .env
-        sed -i "s|^OPENAI_API_BASE_URL=.*|OPENAI_API_BASE_URL=|"                  .env
-        # Sync active model from OLLAMA_MODEL if set
-        [[ -n "${OLLAMA_MODEL:-}" ]] && \
-            sed -i "s|^INFERENCE_MODEL=.*|INFERENCE_MODEL=${OLLAMA_MODEL}|" .env || true
-        {{dc}} \
-            -f {{cf}}docker-compose.yml \
-            -f {{cf}}docker-compose.ollama.yml \
-            -f "{{cf}}docker-compose.gpu-${GPU}-ollama.yml" \
-            up -d
-        PORT="${OLLAMA_PORT:-11435}"
-        echo "Waiting for Ollama to be ready..."
-        for i in $(seq 1 45); do
-            if curl -sf "http://localhost:${PORT}/api/tags" > /dev/null 2>&1; then
-                echo "✓ Ollama ready — http://localhost:${PORT}"
-                break
+            if [[ "$PLATFORM" != "mac" ]]; then
+                {{dc}} -f {{cf}}docker-compose.yml -f {{cf}}docker-compose.llamacpp.yml \
+                    -f "{{cf}}docker-compose.gpu-${GPU}-llamacpp.yml" down llamacpp 2>/dev/null || true
             fi
-            [[ $i -lt 45 ]] && sleep 2 || echo "! Ollama still starting — check: just logs ollama"
-        done
+        fi
+        if [[ "$PLATFORM" == "mac" ]]; then
+            # Ollama runs on the Mac host — no ollama container or GPU overlay
+            sedi "s|^INFERENCE_PROVIDER=.*|INFERENCE_PROVIDER=ollama|"                                .env
+            sedi "s|^INFERENCE_BASE_URL=.*|INFERENCE_BASE_URL=http://host.docker.internal:11434/v1|" .env
+            sedi "s|^OLLAMA_BASE_URL=.*|OLLAMA_BASE_URL=http://host.docker.internal:11434|"          .env
+            [[ -n "${OLLAMA_MODEL:-}" ]] && \
+                sedi "s|^INFERENCE_MODEL=.*|INFERENCE_MODEL=${OLLAMA_MODEL}|" .env || true
+            {{dc}} -f {{cf}}docker-compose.yml up -d
+            echo "Waiting for Ollama to be ready (host port 11434)..."
+            for i in $(seq 1 45); do
+                if curl -sf "http://localhost:11434/api/tags" > /dev/null 2>&1; then
+                    echo "✓ Ollama ready — http://localhost:11434"
+                    break
+                fi
+                if [[ $i -eq 45 ]]; then
+                    echo "! Ollama is not responding on localhost:11434"
+                    echo "  Make sure Ollama is installed and running: https://ollama.com/download/mac"
+                fi
+                sleep 2
+            done
+        else
+            sedi "s|^INFERENCE_PROVIDER=.*|INFERENCE_PROVIDER=ollama|"              .env
+            sedi "s|^INFERENCE_BASE_URL=.*|INFERENCE_BASE_URL=http://ollama:11434/v1|" .env
+            sedi "s|^OLLAMA_BASE_URL=.*|OLLAMA_BASE_URL=http://ollama:11434|"        .env
+            sedi "s|^OPENAI_API_BASE_URL=.*|OPENAI_API_BASE_URL=|"                  .env
+            [[ -n "${OLLAMA_MODEL:-}" ]] && \
+                sedi "s|^INFERENCE_MODEL=.*|INFERENCE_MODEL=${OLLAMA_MODEL}|" .env || true
+            {{dc}} \
+                -f {{cf}}docker-compose.yml \
+                -f {{cf}}docker-compose.ollama.yml \
+                -f "{{cf}}docker-compose.gpu-${GPU}-ollama.yml" \
+                up -d
+            PORT="${OLLAMA_PORT:-11435}"
+            echo "Waiting for Ollama to be ready..."
+            for i in $(seq 1 45); do
+                if curl -sf "http://localhost:${PORT}/api/tags" > /dev/null 2>&1; then
+                    echo "✓ Ollama ready — http://localhost:${PORT}"
+                    break
+                fi
+                [[ $i -lt 45 ]] && sleep 2 || echo "! Ollama still starting — check: just logs ollama"
+            done
+        fi
         ;;
     llamacpp)
+        if [[ "$PLATFORM" == "mac" ]]; then
+            echo "Llama.cpp is not supported on macOS. Use 'just up ollama' instead."
+            exit 1
+        fi
         [[ -n "${LLAMACPP_MODEL:-}" ]] || {
             echo "No model set. Run: just download llamacpp model <huggingface-repo>"
             exit 1
@@ -60,13 +88,12 @@ up provider:
             {{dc}} -f {{cf}}docker-compose.yml -f {{cf}}docker-compose.ollama.yml \
                 -f "{{cf}}docker-compose.gpu-${GPU}-ollama.yml" down ollama 2>/dev/null || true
         fi
-        sed -i "s|^INFERENCE_PROVIDER=.*|INFERENCE_PROVIDER=llamacpp|"                .env
-        sed -i "s|^INFERENCE_BASE_URL=.*|INFERENCE_BASE_URL=http://llamacpp:8080/v1|" .env
-        sed -i "s|^OLLAMA_BASE_URL=.*|OLLAMA_BASE_URL=|"                              .env
-        sed -i "s|^OPENAI_API_BASE_URL=.*|OPENAI_API_BASE_URL=http://llamacpp:8080/v1|" .env
-        # Sync active model from LLAMACPP_MODEL
+        sedi "s|^INFERENCE_PROVIDER=.*|INFERENCE_PROVIDER=llamacpp|"                .env
+        sedi "s|^INFERENCE_BASE_URL=.*|INFERENCE_BASE_URL=http://llamacpp:8080/v1|" .env
+        sedi "s|^OLLAMA_BASE_URL=.*|OLLAMA_BASE_URL=|"                              .env
+        sedi "s|^OPENAI_API_BASE_URL=.*|OPENAI_API_BASE_URL=http://llamacpp:8080/v1|" .env
         [[ -n "${LLAMACPP_MODEL:-}" ]] && \
-            sed -i "s|^INFERENCE_MODEL=.*|INFERENCE_MODEL=${LLAMACPP_MODEL}|" .env || true
+            sedi "s|^INFERENCE_MODEL=.*|INFERENCE_MODEL=${LLAMACPP_MODEL}|" .env || true
         {{dc}} \
             -f {{cf}}docker-compose.yml \
             -f {{cf}}docker-compose.llamacpp.yml \
@@ -84,6 +111,10 @@ up provider:
         done
         ;;
     comfy)
+        if [[ "$PLATFORM" == "mac" ]]; then
+            echo "ComfyUI GPU passthrough is not supported on macOS."
+            exit 1
+        fi
         echo "Note: ComfyUI uses the GPU. If running alongside llamacpp on a single GPU, VRAM will be shared."
         {{dc}} \
             -f {{cf}}docker-compose.yml \
@@ -101,25 +132,27 @@ up provider:
 down:
     #!/usr/bin/env bash
     source .env 2>/dev/null || true
+    source scripts/gpu-detect.sh
     GPU="${GPU_TYPE:-nvidia}"
     PROVIDER="${INFERENCE_PROVIDER:-ollama}"
-    {{dc}} \
-        -f {{cf}}docker-compose.yml \
-        -f "{{cf}}docker-compose.${PROVIDER}.yml" \
-        -f "{{cf}}docker-compose.gpu-${GPU}-${PROVIDER}.yml" \
-        down
+    compose_args=(-f {{cf}}docker-compose.yml)
+    if [[ "$PLATFORM" != "mac" || "$PROVIDER" != "ollama" ]]; then
+        compose_args+=(-f "{{cf}}docker-compose.${PROVIDER}.yml" -f "{{cf}}docker-compose.gpu-${GPU}-${PROVIDER}.yml")
+    fi
+    {{dc}} "${compose_args[@]}" down
 
 # Restart a single service (e.g. just restart openwebui)
 restart service:
     #!/usr/bin/env bash
     source .env 2>/dev/null || true
+    source scripts/gpu-detect.sh
     GPU="${GPU_TYPE:-nvidia}"
     PROVIDER="${INFERENCE_PROVIDER:-ollama}"
-    {{dc}} \
-        -f {{cf}}docker-compose.yml \
-        -f "{{cf}}docker-compose.${PROVIDER}.yml" \
-        -f "{{cf}}docker-compose.gpu-${GPU}-${PROVIDER}.yml" \
-        restart {{service}}
+    compose_args=(-f {{cf}}docker-compose.yml)
+    if [[ "$PLATFORM" != "mac" || "$PROVIDER" != "ollama" ]]; then
+        compose_args+=(-f "{{cf}}docker-compose.${PROVIDER}.yml" -f "{{cf}}docker-compose.gpu-${GPU}-${PROVIDER}.yml")
+    fi
+    {{dc}} "${compose_args[@]}" restart {{service}}
 
 # Show status of all local-ai-stack containers
 status:
@@ -129,21 +162,59 @@ status:
 logs service="":
     #!/usr/bin/env bash
     source .env 2>/dev/null || true
+    source scripts/gpu-detect.sh
     GPU="${GPU_TYPE:-nvidia}"
     PROVIDER="${INFERENCE_PROVIDER:-ollama}"
-    if [[ -z "{{service}}" ]]; then
-        {{dc}} \
-            -f {{cf}}docker-compose.yml \
-            -f "{{cf}}docker-compose.${PROVIDER}.yml" \
-            -f "{{cf}}docker-compose.gpu-${GPU}-${PROVIDER}.yml" \
-            logs -f
-    else
-        {{dc}} \
-            -f {{cf}}docker-compose.yml \
-            -f "{{cf}}docker-compose.${PROVIDER}.yml" \
-            -f "{{cf}}docker-compose.gpu-${GPU}-${PROVIDER}.yml" \
-            logs -f {{service}}
+    compose_args=(-f {{cf}}docker-compose.yml)
+    if [[ "$PLATFORM" != "mac" || "$PROVIDER" != "ollama" ]]; then
+        compose_args+=(-f "{{cf}}docker-compose.${PROVIDER}.yml" -f "{{cf}}docker-compose.gpu-${GPU}-${PROVIDER}.yml")
     fi
+    if [[ -z "{{service}}" ]]; then
+        {{dc}} "${compose_args[@]}" logs -f
+    else
+        {{dc}} "${compose_args[@]}" logs -f {{service}}
+    fi
+
+# Rebuild one or all custom images: just build | just build hermes
+build service="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    source .env 2>/dev/null || true
+    source scripts/gpu-detect.sh
+    GPU="${GPU_TYPE:-nvidia}"
+    PROVIDER="${INFERENCE_PROVIDER:-ollama}"
+    compose_args=(-f {{cf}}docker-compose.yml)
+    if [[ "$PLATFORM" != "mac" || "$PROVIDER" != "ollama" ]]; then
+        compose_args+=(-f "{{cf}}docker-compose.${PROVIDER}.yml" -f "{{cf}}docker-compose.gpu-${GPU}-${PROVIDER}.yml")
+    fi
+    if [[ -n "{{service}}" ]]; then
+        echo "Building {{service}}..."
+        {{dc}} "${compose_args[@]}" build {{service}}
+    else
+        echo "Building all custom images..."
+        {{dc}} "${compose_args[@]}" build
+    fi
+
+# Pull latest code, rebuild images, and restart the running stack
+update:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    [[ -f .env ]] || { echo "Run 'just setup' first"; exit 1; }
+    source .env
+    source scripts/gpu-detect.sh
+    GPU="${GPU_TYPE:-nvidia}"
+    PROVIDER="${INFERENCE_PROVIDER:-ollama}"
+    compose_args=(-f {{cf}}docker-compose.yml)
+    if [[ "$PLATFORM" != "mac" || "$PROVIDER" != "ollama" ]]; then
+        compose_args+=(-f "{{cf}}docker-compose.${PROVIDER}.yml" -f "{{cf}}docker-compose.gpu-${GPU}-${PROVIDER}.yml")
+    fi
+    echo "Pulling latest code..."
+    git pull
+    echo "Rebuilding images..."
+    {{dc}} "${compose_args[@]}" build
+    echo "Restarting stack..."
+    {{dc}} "${compose_args[@]}" up -d --remove-orphans
+    echo "Done — stack updated and restarted."
 
 # ── Model management ───────────────────────────────────────────────────────
 
@@ -155,8 +226,9 @@ download provider type model:
 # Set the active llamacpp model by filename (called automatically by download)
 set provider model:
     #!/usr/bin/env bash
+    source scripts/gpu-detect.sh
     if [[ "{{provider}}" == "llamacpp" ]]; then
-        sed -i "s|^LLAMACPP_MODEL=.*|LLAMACPP_MODEL={{model}}|" .env
+        sedi "s|^LLAMACPP_MODEL=.*|LLAMACPP_MODEL={{model}}|" .env
         echo "Active llamacpp model: {{model}}"
         echo "Start the stack with: just up llamacpp"
     else
@@ -223,6 +295,8 @@ test-compose:
     check -f {{cf}}docker-compose.yml -f {{cf}}docker-compose.llamacpp.yml -f {{cf}}docker-compose.gpu-amd-llamacpp.yml
     check -f {{cf}}docker-compose.yml -f {{cf}}docker-compose.comfy.yml    -f {{cf}}docker-compose.gpu-nvidia-comfy.yml
     check -f {{cf}}docker-compose.yml -f {{cf}}docker-compose.comfy.yml    -f {{cf}}docker-compose.gpu-amd-comfy.yml
+    # macOS: base compose only (no ollama container or GPU overlay)
+    check -f {{cf}}docker-compose.yml
     echo "✓ All compose files valid"
 
 # Lint all Dockerfiles with hadolint (runs via Docker — no local install needed)

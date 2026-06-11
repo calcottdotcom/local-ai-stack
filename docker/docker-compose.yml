@@ -7,7 +7,6 @@ networks:
 volumes:
   openwebui-data:
   hermes-home:
-  hermes-webui-state:
   opendesign-data:
 
 services:
@@ -47,8 +46,10 @@ services:
   hermes:
     build: ./docker/hermes
     container_name: hermes
+    ports:
+      - "${HERMES_PORT:-8787}:8787"
     volumes:
-      - hermes-home:/home/hermes
+      - hermes-home:/root
     environment:
       - INFERENCE_BASE_URL=${INFERENCE_BASE_URL:-http://ollama:11434/v1}
       - OPENAI_API_BASE_URL=${INFERENCE_BASE_URL:-http://ollama:11434/v1}
@@ -57,25 +58,11 @@ services:
       - OLLAMA_MODEL=${OLLAMA_MODEL:-}
       - LLAMACPP_MODEL=${LLAMACPP_MODEL:-}
       - LLAMACPP_CTX=${LLAMACPP_CTX:-65536}
-    networks:
-      - local-ai-net
-    restart: unless-stopped
-
-  hermes-webui:
-    build:
-      context: https://github.com/nesquena/hermes-webui.git
-    container_name: hermes-webui
-    ports:
-      - "${HERMES_PORT:-8787}:8787"
-    volumes:
-      - hermes-home:/home/hermeswebui/.hermes
-      - hermes-webui-state:/home/hermeswebui/.hermes/webui
-    environment:
-      - WANTED_UID=${HOST_UID:-1000}
-      - WANTED_GID=${HOST_GID:-1000}
       - HERMES_WEBUI_HOST=0.0.0.0
       - HERMES_WEBUI_PORT=8787
-      - HERMES_WEBUI_STATE_DIR=/home/hermeswebui/.hermes/webui
+      - HERMES_WEBUI_STATE_DIR=/root/.hermes/webui
+      - HERMES_WEBUI_AGENT_DIR=/usr/local/lib/hermes-agent
+      - HERMES_WEBUI_AUTO_INSTALL=1
     networks:
       - local-ai-net
     restart: unless-stopped
@@ -134,4 +121,4 @@ services:
     depends_on:
       - openwebui
       - searxng
-      - hermes-webui
+      - hermes

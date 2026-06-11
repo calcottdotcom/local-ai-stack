@@ -7,8 +7,7 @@ There's loads of options for running local LLMs as well as utilities that can si
 * An LLM inference engine. We'll be using [Ollama](https://ollama.com/) or [Llama.cpp](https://github.com/ggml-org/llama.cpp) - both with benefits over each other.
 * A web-based chat UI for that ChatGPT feel. We'll use [OpenWebUI](https://github.com/open-webui/open-webui)
 * A web search service for the chat UI and other services to use. We'll use [Searxng](https://github.com/searxng/searxng)
-* A generalist AI agent, which you can use to get to do stuff. We'll use [Hermes](https://github.com/nousresearch/hermes-agent)
-* A web ui for the generalist agent. We'll use [Hermes Web UI](https://github.com/nesquena/hermes-webui)
+* A generalist AI agent with a built-in web UI, which you can use to get things done. We'll use [Hermes](https://github.com/nousresearch/hermes-agent) with [Hermes Web UI](https://github.com/nesquena/hermes-webui) embedded in the same container
 * A coding AI agent, lightweight and dedicated to coding as opposed to the generalist. We'll use [Pi Coding Agent](https://github.com/earendil-works/pi)
 * A general web server which the agents can ssh into to run things. We'll use an ubuntu container - asking the agents to setup nginx etc.
 * A reverse proxy to allow for domain mapping to these container services on different ports. We'll use nginx. Along with this we have a wrapper for local domains and SSL using [mkcert](https://github.com/filosottile/mkcert) and your `/etc/hosts` file (optional but makes things feel more like real-world services!).
@@ -19,11 +18,99 @@ There's loads of options for running local LLMs as well as utilities that can si
 Each of these is outlined in more detail below. There's a one-shot docker compose file and some just commands you can run to go with the defaults, and a set of config and .env files you can edit to customise. 
 
 ## Requirements
-This is currently targeting a linux environment with a dedicated GPU (ideally Nvidia, though AMD should work). Just is used to wrap bash and other commands, as is docker for containers.
 
-To pass through your GPU to the docker containers:
-* On Nvidia, you'll need to install the Nvidia Container Toolkit, as well as the official Nvidia linux drivers. 
-* On AMD you'll need to install rocm and add your user to the render and video groups
+You'll need **Docker** and **just** installed. The stack runs on Linux, Windows (via WSL2), and macOS.
+
+### Linux (native)
+
+Install the [Nvidia Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) for Nvidia GPU passthrough, or ROCm + video/render group membership for AMD.
+
+```bash
+sudo apt install just        # Ubuntu/Debian
+# or: curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to ~/.local/bin
+```
+
+### Windows (WSL2)
+
+The stack runs inside WSL2 (a Linux environment built into Windows). Docker Desktop runs as a Windows app and shares itself with WSL2 — you don't install Docker inside WSL, and you don't run commands in PowerShell. Everything below happens in your **Ubuntu/WSL terminal**.
+
+**Step 1 — Enable WSL2** (skip if already done):
+```powershell
+# Run in PowerShell as Administrator, then restart when prompted
+wsl --install
+```
+After the restart, open the **Ubuntu** app from the Start menu and complete the Linux user setup.
+
+**Step 2 — Install Docker Desktop for Windows:**  
+[https://docs.docker.com/desktop/setup/install/windows-install/](https://docs.docker.com/desktop/setup/install/windows-install/)
+
+Once installed, open Docker Desktop and configure two settings:
+- **Settings → General**: confirm **"Use the WSL 2 based engine"** is ticked
+- **Settings → Resources → WSL Integration**: enable the toggle for your **Ubuntu** distro
+
+Verify Docker is accessible from WSL by opening your Ubuntu terminal and running:
+```bash
+docker --version   # should print a version number, not "command not found"
+```
+
+**Step 3 — Install `just`** (in your Ubuntu/WSL terminal):
+```bash
+sudo apt install just
+```
+
+**Step 4 — Nvidia GPU passthrough** (skip if no Nvidia GPU):
+
+Your existing game-ready drivers on Windows already include everything needed — no separate CUDA or WSL driver install is required. Docker Desktop handles GPU passthrough to containers automatically via the WSL2 backend.
+
+Verify your GPU is visible from WSL:
+```bash
+nvidia-smi   # should show your GPU and driver version
+```
+If that works, you're done — the stack's compose files handle GPU passthrough automatically, no extra flags needed.
+
+**Step 5 — Clone and run** (in your Ubuntu/WSL terminal):
+```bash
+git clone https://github.com/calcottdotcom/local-ai-stack.git
+cd local-ai-stack
+just setup
+```
+
+> **Important:** all `just` commands must be run from your **Ubuntu/WSL terminal**, not PowerShell or CMD. The justfile uses bash. If you open a new terminal, make sure you're in the Ubuntu app (or Windows Terminal with the Ubuntu profile selected), not a Windows shell.
+
+### macOS
+
+On macOS, Ollama runs **natively on the host** (not in Docker) so it can use Metal GPU acceleration. Docker containers connect to it via `host.docker.internal`.
+
+**Step 1 — Install Docker Desktop for Mac:**  
+[https://docs.docker.com/desktop/setup/install/mac-install/](https://docs.docker.com/desktop/setup/install/mac-install/)
+
+**Step 2 — Install `just` and Ollama:**
+```bash
+brew install just
+brew install ollama
+```
+Or install Ollama from [https://ollama.com/download/mac](https://ollama.com/download/mac) (menu bar app).
+
+**Step 3 — Start Ollama** (if using the menu bar app, just open it; if using Homebrew, run `ollama serve`).
+
+**Step 4 — Clone and run:**
+```bash
+git clone https://github.com/calcottdotcom/local-ai-stack.git
+cd local-ai-stack
+just setup
+```
+
+The setup wizard detects macOS, estimates usable RAM for model sizing (40% of total — conservative for OS + Docker overhead), and skips the provider selection (Ollama only on Mac). It will recommend a model appropriate for your RAM:
+
+| Total RAM | Recommended model |
+|-----------|------------------|
+| 24 GB+    | gemma4:12b (128K context) |
+| 16 GB     | gemma4:12b |
+| 12 GB     | qwen3.5:9b |
+| 8 GB      | qwen3.5:7b |
+| < 8 GB    | qwen3.5:4b |
+
+> **Note:** Llama.cpp and ComfyUI are not supported on macOS — `just up ollama` is the only inference path.
 
 ## Getting started
 ### Setup
@@ -66,7 +153,7 @@ The quickest test to ensure the basics are working is to run `just up ollama` th
 Next, go to the chat UI and you should see the model named in the top left. If using ollama, you can choose between multiple models you've downloaded.
 
 ## Starting with agents
-Running `just hermes ssh` will ssh into the hermes container. This container has persistent volumes so anything installed by apt or in the home folders will survive a reboot. Running `hermes` within the ssh session will start the hermes session - on the first run its usually a good idea to tell the agent who they are and how to behave / sound.
+Running `just hermes ssh` will ssh into the hermes container. The hermes container runs as root, so the agent can `apt-get install` freely during a session. To persist a package across container restarts, add it to `~/.hermes/apt-packages.txt` (one per line) — those packages are reinstalled automatically on every start. Files and Python venvs created inside the workspace (`~/workspace/`) live on a persistent Docker volume and survive restarts normally. Running `hermes` within the ssh session will start the hermes session - on the first run it's usually a good idea to tell the agent who they are and how to behave / sound.
 
 By default the agents don't know how to do web searches using the tools we've given them. So for the first prompt, try:
 ```

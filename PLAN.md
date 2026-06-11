@@ -2,7 +2,7 @@
 
 ## Overview
 
-A self-hosted AI stack running on a local GPU. Services are orchestrated via Docker Compose, controlled through a `justfile`, and targeted at Linux with Nvidia or AMD GPU passthrough. Mac/Windows support is a future goal.
+A self-hosted AI stack running on a local GPU. Services are orchestrated via Docker Compose, controlled through a `justfile`. Supports Linux (Nvidia/AMD GPU passthrough), macOS (native Ollama on host via Metal), and Windows WSL2.
 
 ---
 
@@ -77,30 +77,43 @@ A self-hosted AI stack running on a local GPU. Services are orchestrated via Doc
 - [x] `just hermes ssh` drops into a working shell with `hermes` on `$PATH`
 - [x] Hermes agent can reach the active inference endpoint from inside the container
 - [x] Hermes pointed at Searxng for web search (first-run prompt from README)
-- [x] `docker/hermes-webui` builds from the upstream GitHub context
-- [x] Hermes Web UI loads at `http://localhost:8787`
+- [x] Hermes Web UI (hermes-webui) embedded inside the hermes container; loads at `http://localhost:8787`
+- [x] Hermes container runs as root; agent can `apt-get install` freely during a session
+- [x] `apt-packages.txt` pattern: packages listed in `~/.hermes/apt-packages.txt` are reinstalled on every container start for persistence across restarts
+- [x] `SOUL.md` injected by entrypoint each start to tell the agent how to persist software installs
 - [x] `docker/pi/Dockerfile` builds successfully
 - [x] Pi coding agent starts and connects to the inference endpoint
 - [x] Ubuntu server sandbox starts with SSH and nginx accessible
 
 **Fixes discovered during live testing:**
-- `just hermes ssh` must use `-u hermes` flag so the shell runs as the hermes user with the correct `$PATH`; defaulting to root misses the user-local install paths
-- Ubuntu 24.04 base image ships an `ubuntu` user at uid 1000, pushing hermes to uid 1001. Docker volume init writes files owned by uid 1000, so hermes (1001) gets Permission denied on `drwxr-x---`. Fixed by removing the ubuntu user in the Dockerfile so hermes claims uid 1000.
+- Ubuntu 24.04 base image ships an `ubuntu` user at uid 1000 — originally caused permission issues. Resolved by switching to root (simpler, enables agent self-improvement).
+- hermes-webui init script ran as root and chowned the shared `hermes-home` volume to host uid (501 on Mac), locking hermes out of its own home. Fix: dropped separate hermes-webui container entirely; webui is now embedded in the hermes image at `/opt/hermes-webui`, run with hermes's own venv Python (`/usr/local/lib/hermes-agent/venv/bin/python`) so all agent deps are importable without a separate install step.
 - Agent containers started before `just download` complete have a stale `INFERENCE_MODEL` env var. Fixed by having `download-model.sh` restart running agent containers after updating `.env`.
 - Pi coding agent uses `~/.pi/agent/models.json` (not env vars alone) to override the provider base URL. Entrypoint writes both `models.json` and `settings.json` on every start.
 
 ---
 
-### Phase 5 — Mac & Windows Support 📋
+### Phase 5 — Mac & Windows Support 🔄
 
 **Goal:** The stack runs on Mac (Apple Silicon / Intel) and Windows (WSL2) with appropriate GPU or CPU-only fallback.
 
-- [ ] Determine GPU passthrough approach for Mac (Metal via Ollama's native support)
-- [ ] Determine GPU passthrough approach for Windows (WSL2 + Nvidia)
-- [ ] OS detection in `just setup` and `scripts/gpu-detect.sh`
-- [ ] Compose GPU overlays for Mac/Windows variants where needed
-- [ ] `sed -i` portability fixed for macOS (`sed -i ''`)
-- [ ] README updated with Mac/Windows instructions
+**macOS:**
+- [x] Ollama runs natively on host (Metal acceleration); Docker containers use `host.docker.internal:11434`
+- [x] `detect_platform()` in `gpu-detect.sh` returns `mac`; `detect_gpu()` uses `sysctl hw.memsize` (40% RAM estimate)
+- [x] `sedi()` helper in `gpu-detect.sh` — BSD `sed -i ''` on Mac, GNU `sed -i` elsewhere
+- [x] `just setup` on Mac: checks Ollama CLI, skips provider selection, sets `host.docker.internal` URLs in `.env`
+- [x] `just up ollama` on Mac: skips ollama/GPU overlays, starts base compose only, waits on host port 11434
+- [x] `just up llamacpp` / `just up comfy` on Mac: exits with clear unsupported message
+- [x] `just down/restart/logs` on Mac: skips provider/GPU overlays for ollama
+- [x] `just download ollama model` on Mac: uses native `ollama pull/create` on host (no `docker exec`)
+- [x] All `sed -i` calls in `justfile` and `download-model.sh` replaced with `sedi`
+- [x] README macOS section: full install guide, RAM-tier model table, host-Ollama explanation
+
+**Windows (WSL2):**
+- [x] `detect_platform()` returns `wsl` when `/proc/version` contains "microsoft" or "wsl"
+- [x] `just setup` shows WSL2-specific install instructions for docker and just
+- [x] README Windows section: 5-step guide (WSL2 enable, Docker Desktop, just, Nvidia drivers, clone & run)
+- [ ] End-to-end test on a real Windows machine (WSL2 + Docker Desktop)
 
 ---
 

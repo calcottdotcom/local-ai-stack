@@ -2,7 +2,44 @@
 # Outputs two lines: GPU_TYPE and VRAM_GB
 # Sourced by setup.sh; can also be run standalone.
 
+# Returns: linux | wsl | mac
+detect_platform() {
+    case "$(uname -s)" in
+        Darwin) echo "mac" ;;
+        Linux)
+            if grep -qi "microsoft\|wsl" /proc/version 2>/dev/null; then
+                echo "wsl"
+            else
+                echo "linux"
+            fi
+            ;;
+        *) echo "linux" ;;
+    esac
+}
+
+PLATFORM="$(detect_platform)"
+
+# Cross-platform in-place sed: BSD sed (macOS) needs an explicit backup extension.
+sedi() {
+    if [[ "$PLATFORM" == "mac" ]]; then
+        sed -i '' "$@"
+    else
+        sed -i "$@"
+    fi
+}
+
 detect_gpu() {
+    # macOS: Ollama runs on the host and uses Metal / unified memory.
+    # We estimate usable RAM as 40% of total (OS + Docker take the rest).
+    if [[ "$PLATFORM" == "mac" ]]; then
+        local total_bytes
+        total_bytes=$(sysctl -n hw.memsize 2>/dev/null || echo 0)
+        local total_gb=$(( total_bytes / 1024 / 1024 / 1024 ))
+        GPU_TYPE=apple
+        VRAM_GB=$(( total_gb * 2 / 5 ))   # ~40 % — conservative for shared RAM
+        return 0
+    fi
+
     if command -v nvidia-smi &>/dev/null; then
         local vram
         vram=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits 2>/dev/null | head -1)
@@ -53,6 +90,7 @@ recommend_ctx() {
 # Run standalone
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     detect_gpu
+    echo "Platform : $PLATFORM"
     echo "GPU type : $GPU_TYPE"
     echo "VRAM     : ${VRAM_GB}GB"
     echo "Suggested: $(recommend_model "$VRAM_GB")"

@@ -27,9 +27,24 @@ detect_gpu || true
 # OLLAMA
 # ─────────────────────────────────────────────────────────────────────────
 if [[ "$PROVIDER" == "ollama" ]]; then
-    # Ensure ollama is running
-    docker ps -q --filter name=ollama | grep -q . || \
-        die "Ollama container is not running. Start with: just up ollama"
+    # ── Helpers: abstract host-ollama vs container-ollama ──────────────────
+    if [[ "$PLATFORM" == "mac" ]]; then
+        # Ollama runs on the Mac host — use the CLI directly
+        command -v ollama &>/dev/null || \
+            die "Ollama is not installed on this Mac. Install from https://ollama.com/download/mac"
+        ollama_list()   { ollama list; }
+        ollama_pull()   { ollama pull "$1"; }
+        ollama_rm()     { ollama rm "$1"; }
+        ollama_create() { ollama create "$1" -f "$2"; }
+    else
+        # Linux / WSL2 — use the ollama container
+        docker ps -q --filter name=ollama | grep -q . || \
+            die "Ollama container is not running. Start with: just up ollama"
+        ollama_list()   { docker exec ollama ollama list; }
+        ollama_pull()   { docker exec ollama ollama pull "$1"; }
+        ollama_rm()     { docker exec ollama ollama rm "$1"; }
+        ollama_create() { docker exec ollama ollama create "$1" -f "$2"; }
+    fi
 
     # Check if the localai-tuned variant already exists to avoid unnecessary re-pulls
     # Preserve the param-count tag: qwen3.5:9b → qwen3.5:9b-localai
@@ -38,14 +53,18 @@ if [[ "$PROVIDER" == "ollama" ]]; then
     else
         TAGGED_MODEL="${MODEL}:localai"
     fi
-    if docker exec ollama ollama list 2>/dev/null | grep -qF "${TAGGED_MODEL}"; then
+    if ollama_list 2>/dev/null | grep -qF "${TAGGED_MODEL}"; then
         ok "Model '$TAGGED_MODEL' already exists"
-        info "To re-download, first run: docker exec ollama ollama rm ${TAGGED_MODEL}"
+        if [[ "$PLATFORM" == "mac" ]]; then
+            info "To re-download, first run: ollama rm ${TAGGED_MODEL}"
+        else
+            info "To re-download, first run: docker exec ollama ollama rm ${TAGGED_MODEL}"
+        fi
         exit 0
     fi
 
     bold "Pulling model: $MODEL"
-    if ! docker exec ollama ollama pull "$MODEL"; then
+    if ! ollama_pull "$MODEL"; then
         die "Pull failed — check network connectivity and that '$MODEL' is a valid Ollama model tag"
     fi
     ok "Model pulled"
@@ -64,24 +83,28 @@ if [[ "$PROVIDER" == "ollama" ]]; then
     CTX=$(recommend_ctx "$VRAM_GB" "$MODEL_SIZE_GB")
     info "VRAM: ${VRAM_GB}GB, model ~${MODEL_SIZE_GB}GB → setting context to $CTX tokens"
 
-    # Write Modelfile and create a tuned version of the model
-    MODELFILE_CONTENT="FROM ${MODEL}
-PARAMETER num_ctx ${CTX}"
-
     info "Creating tuned model: $TAGGED_MODEL"
 
-    # Write Modelfile into the container and create the model
-    docker exec ollama bash -c "
-        echo '${MODELFILE_CONTENT}' > /tmp/Modelfile
-        ollama create '${TAGGED_MODEL}' -f /tmp/Modelfile
-        rm /tmp/Modelfile
-    "
+    MODELFILE_PATH=$(mktemp /tmp/Modelfile.XXXXXX)
+    printf 'FROM %s\nPARAMETER num_ctx %s\n' "$MODEL" "$CTX" > "$MODELFILE_PATH"
+    if [[ "$PLATFORM" == "mac" ]]; then
+        ollama_create "$TAGGED_MODEL" "$MODELFILE_PATH"
+    else
+        docker cp "$MODELFILE_PATH" ollama:/tmp/Modelfile
+        docker exec ollama ollama create "$TAGGED_MODEL" -f /tmp/Modelfile
+        docker exec ollama rm -f /tmp/Modelfile
+    fi
+    rm -f "$MODELFILE_PATH"
     ok "Model ready: $TAGGED_MODEL (context: $CTX tokens)"
-    info "Storage: docker volume 'local-ai-stack_ollama-models'"
+    if [[ "$PLATFORM" == "mac" ]]; then
+        info "Storage: ~/.ollama/models"
+    else
+        info "Storage: docker volume 'local-ai-stack_ollama-models'"
+    fi
 
     # Track the active model in .env so agents pick it up on next start
-    sed -i "s|^OLLAMA_MODEL=.*|OLLAMA_MODEL=${TAGGED_MODEL}|" "$ROOT_DIR/.env"
-    sed -i "s|^INFERENCE_MODEL=.*|INFERENCE_MODEL=${TAGGED_MODEL}|" "$ROOT_DIR/.env"
+    sedi "s|^OLLAMA_MODEL=.*|OLLAMA_MODEL=${TAGGED_MODEL}|" "$ROOT_DIR/.env"
+    sedi "s|^INFERENCE_MODEL=.*|INFERENCE_MODEL=${TAGGED_MODEL}|" "$ROOT_DIR/.env"
 
     # Restart running agent containers so they pick up the new model immediately
     for agent in hermes pi; do
@@ -177,8 +200,8 @@ else:
     info "VRAM: ${VRAM_GB}GB, model ~${MODEL_SIZE_GB}GB → recommended context: $CTX tokens"
 
     # Update .env
-    sed -i "s|^LLAMACPP_MODEL=.*|LLAMACPP_MODEL=${GGUF_FILENAME}|" "$ROOT_DIR/.env"
-    sed -i "s|^LLAMACPP_CTX=.*|LLAMACPP_CTX=${CTX}|" "$ROOT_DIR/.env"
+    sedi "s|^LLAMACPP_MODEL=.*|LLAMACPP_MODEL=${GGUF_FILENAME}|" "$ROOT_DIR/.env"
+    sedi "s|^LLAMACPP_CTX=.*|LLAMACPP_CTX=${CTX}|" "$ROOT_DIR/.env"
 
     ok "Set LLAMACPP_MODEL=$GGUF_FILENAME, LLAMACPP_CTX=$CTX in .env"
     info "Start the stack with: just up llamacpp"
