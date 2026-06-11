@@ -164,40 +164,118 @@ else
     ok "Provider: $PROVIDER"
 fi
 
-# ── Model recommendation ───────────────────────────────────────────────────
+# ── Interactive list picker ────────────────────────────────────────────────
+
+_PICK_OPTIONS=()
+PICK_RESULT=""
+
+_draw_pick() {
+    local current=$1 i
+    for i in "${!_PICK_OPTIONS[@]}"; do
+        if (( i == current )); then
+            printf "  \033[36m❯\033[0m \033[1m%s\033[0m\n" "${_PICK_OPTIONS[$i]}"
+        else
+            printf "    %s\n" "${_PICK_OPTIONS[$i]}"
+        fi
+    done
+}
+
+pick_from_list() {
+    local sel=0 len=${#_PICK_OPTIONS[@]} key esc
+
+    # Non-interactive fallback (CI / piped input)
+    if [[ ! -t 0 ]]; then
+        PICK_RESULT="${_PICK_OPTIONS[0]}"
+        return
+    fi
+
+    tput civis 2>/dev/null || true
+    _draw_pick "$sel"
+
+    while true; do
+        IFS= read -rsn1 key
+        if [[ "$key" == $'\x1b' ]]; then
+            IFS= read -rsn2 -t 0.1 esc || esc=""
+            case "$esc" in
+                '[A') if [[ $sel -gt 0 ]]; then sel=$(( sel - 1 )); fi ;;
+                '[B') if [[ $sel -lt $(( len - 1 )) ]]; then sel=$(( sel + 1 )); fi ;;
+            esac
+        elif [[ -z "$key" ]]; then
+            break
+        fi
+        printf '\033[%dA\033[J' "$len"
+        _draw_pick "$sel"
+    done
+
+    tput cnorm 2>/dev/null || true
+    PICK_RESULT="${_PICK_OPTIONS[$sel]}"
+}
+
+# ── Model selection ────────────────────────────────────────────────────────
+
+MODEL=""
 
 echo ""
 if [[ "$PLATFORM" == "mac" ]]; then
-    bold "Model recommendation for ${TOTAL_RAM_GB}GB RAM Mac:"
+    bold "Select a model to download (${TOTAL_RAM_GB}GB RAM Mac):"
 else
-    bold "Model recommendation for ${VRAM_GB}GB VRAM:"
+    bold "Select a model to download (${VRAM_GB}GB VRAM):"
 fi
-info "$(recommend_model "$VRAM_GB")"
+info "Recommended: $(recommend_model "$VRAM_GB")"
+info "Use ↑/↓ arrows and Enter to select"
 echo ""
 
-DOWNLOAD_NOW=$(ask "Download the recommended model now? [Y/n]:")
-DOWNLOAD_NOW=${DOWNLOAD_NOW:-Y}
-
-if [[ "$DOWNLOAD_NOW" =~ ^[Yy]$ ]]; then
-    if [[ "$PROVIDER" == "ollama" ]]; then
-        if   (( VRAM_GB >= 15 )); then DEFAULT_MODEL="gemma4:12b"
-        elif (( VRAM_GB >= 12 )); then DEFAULT_MODEL="qwen3.5:9b"
-        elif (( VRAM_GB >=  8 )); then DEFAULT_MODEL="qwen3.5:7b"
-        else                           DEFAULT_MODEL="qwen3.5:4b"
-        fi
-        MODEL=$(ask "Model tag [default: $DEFAULT_MODEL]:")
-        MODEL=${MODEL:-$DEFAULT_MODEL}
-        info "Will download after stack starts."
-        info "Run: just download ollama model $MODEL"
+if [[ "$PROVIDER" == "ollama" ]]; then
+    _PICK_OPTIONS=()
+    if   (( VRAM_GB >= 15 )); then
+        _PICK_OPTIONS=("gemma4:12b" "qwen3.5:9b" "qwen3.5:7b" "qwen3.5:4b")
+    elif (( VRAM_GB >= 12 )); then
+        _PICK_OPTIONS=("qwen3.5:9b" "gemma4:12b" "qwen3.5:7b" "qwen3.5:4b")
+    elif (( VRAM_GB >= 8 )); then
+        _PICK_OPTIONS=("qwen3.5:7b" "qwen3.5:9b" "qwen3.5:4b")
     else
-        if   (( VRAM_GB >= 12 )); then DEFAULT_MODEL="google/gemma-4-12B-it-qat-q4_0-gguf"
-        else                           DEFAULT_MODEL="Qwen/Qwen2.5-7B-Instruct-GGUF"
-        fi
-        MODEL=$(ask "HuggingFace repo [default: $DEFAULT_MODEL]:")
-        MODEL=${MODEL:-$DEFAULT_MODEL}
-        info "Will download after stack starts."
-        info "Run: just download llamacpp model $MODEL"
+        _PICK_OPTIONS=("qwen3.5:4b" "qwen3.5:7b")
     fi
+    _PICK_OPTIONS+=("Enter model tag manually..." "Skip — I'll download a model later")
+
+    pick_from_list
+
+    case "$PICK_RESULT" in
+        "Enter model tag manually...")
+            MODEL=$(ask "Model tag (e.g. qwen3.5:9b):")
+            ;;
+        "Skip — I'll download a model later")
+            MODEL=""
+            ;;
+        *)
+            MODEL="$PICK_RESULT"
+            ok "Selected: $MODEL"
+            ;;
+    esac
+else
+    if   (( VRAM_GB >= 12 )); then DEFAULT_MODEL="google/gemma-4-12B-it-qat-q4_0-gguf"
+    else                           DEFAULT_MODEL="Qwen/Qwen2.5-7B-Instruct-GGUF"
+    fi
+    _PICK_OPTIONS=(
+        "$DEFAULT_MODEL"
+        "Enter HuggingFace repo manually..."
+        "Skip — I'll download a model later"
+    )
+
+    pick_from_list
+
+    case "$PICK_RESULT" in
+        "Enter HuggingFace repo manually...")
+            MODEL=$(ask "HuggingFace repo (e.g. Qwen/Qwen2.5-7B-Instruct-GGUF):")
+            ;;
+        "Skip — I'll download a model later")
+            MODEL=""
+            ;;
+        *)
+            MODEL="$PICK_RESULT"
+            ok "Selected: $MODEL"
+            ;;
+    esac
 fi
 
 # ── Local domains (optional) ───────────────────────────────────────────────
@@ -215,14 +293,45 @@ if [[ "$SETUP_DOMAINS" =~ ^[Yy]$ ]]; then
     bash "$SCRIPT_DIR/setup-local-domains.sh"
 fi
 
-# ── Done ───────────────────────────────────────────────────────────────────
+# ── Launch ─────────────────────────────────────────────────────────────────
 
 echo ""
 bold "Setup complete!"
 echo ""
-info "Start the stack:     just up $PROVIDER"
-if [[ "${MODEL:-}" != "" ]]; then
-info "Then download model: just download $PROVIDER model $MODEL"
+
+START_NOW=$(ask "Start the stack now? [Y/n]:")
+START_NOW=${START_NOW:-Y}
+
+if [[ "$START_NOW" =~ ^[Yy]$ ]]; then
+    if [[ -n "$MODEL" && "$PROVIDER" == "llamacpp" ]]; then
+        # llamacpp needs the model file present before the container will start
+        info "Downloading model (this may take several minutes)..."
+        (cd "$ROOT_DIR" && just download "$PROVIDER" model "$MODEL")
+    fi
+
+    info "Starting stack..."
+    (cd "$ROOT_DIR" && just up "$PROVIDER")
+
+    if [[ -n "$MODEL" && "$PROVIDER" == "ollama" ]]; then
+        # ollama: service must be running before we can pull
+        info "Downloading model..."
+        (cd "$ROOT_DIR" && just download "$PROVIDER" model "$MODEL")
+    fi
+
+    echo ""
+    ok "Stack is running!"
+    info "Open chat UI: http://localhost:${OPENWEBUI_PORT:-8086}"
+    [[ -n "$MODEL" ]] && info "Model: $MODEL"
+else
+    echo ""
+    info "When you're ready:"
+    if [[ -n "$MODEL" && "$PROVIDER" == "llamacpp" ]]; then
+        info "  just download $PROVIDER model $MODEL"
+    fi
+    info "  just up $PROVIDER"
+    if [[ -n "$MODEL" && "$PROVIDER" == "ollama" ]]; then
+        info "  just download $PROVIDER model $MODEL"
+    fi
+    info "Open chat UI: http://localhost:${OPENWEBUI_PORT:-8086}"
 fi
-info "Open chat UI:        http://localhost:${OPENWEBUI_PORT:-8086}"
 echo ""

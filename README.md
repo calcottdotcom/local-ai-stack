@@ -119,7 +119,7 @@ Just run `just setup` for an interactive setup process which will analyse the re
 ## Running the stack
 All of the containers belong to the same docker compose stack (named `local-ai-stack`) and there's a few options here:
 * `just up ollama` runs the stack with ollama as the inference provider
-* `just up llamacpp` runs the stack with llama.cpp as the inference provider
+* `just up llamacpp` runs the stack with llama.cpp as the inference provider *(coming soon — not yet recommended for general use)*
 * `just up comfy` runs the comfyui service. Note that if you only have one GPU you're unlikely to be able to run this alongside llamacpp
 * `just setup local-domains` will modify your /etc/hosts file and configure mkcert
 
