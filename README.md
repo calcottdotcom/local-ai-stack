@@ -26,8 +26,10 @@ You'll need **Docker** and **just** installed. The stack runs on Linux, Windows 
 Install the [Nvidia Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) for Nvidia GPU passthrough, or ROCm + video/render group membership for AMD.
 
 ```bash
-sudo apt install just        # Ubuntu/Debian
-# or: curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to ~/.local/bin
+# Ubuntu/Debian
+sudo apt install just
+# or:
+curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to ~/.local/bin
 ```
 
 ### Windows (WSL2)
