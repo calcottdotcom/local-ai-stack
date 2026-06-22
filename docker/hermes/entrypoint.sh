@@ -11,7 +11,10 @@ OLLAMA_CTX="${OLLAMA_CTX:-}"
 LLAMACPP_MDL="${LLAMACPP_MODEL:-}"
 LLAMACPP_CTX="${LLAMACPP_CTX:-65536}"
 
-[[ "$PROVIDER" == "llamacpp" ]] && HERMES_PROVIDER="custom" || HERMES_PROVIDER="ollama"
+# hermes aliases "ollama" → "custom" internally; use "custom" directly so the
+# config provider matches what sessions store, avoiding @custom:name:tag wrapping
+# that causes rsplit to truncate "name:tag" model IDs to just "tag".
+HERMES_PROVIDER="custom"
 
 cfg() { hermes config set "$1" "$2"; }
 
