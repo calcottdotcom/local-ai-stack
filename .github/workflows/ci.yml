@@ -117,6 +117,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Generate dummy certs for syntax check
+        # ssl.conf references these paths; certs are gitignored so we generate
+        # throw-away self-signed certs just to satisfy nginx -t.
+        run: |
+          mkdir -p config/nginx/certs
+          openssl req -x509 -newkey rsa:2048 -days 1 -nodes \
+            -keyout config/nginx/certs/localai-key.pem \
+            -out    config/nginx/certs/localai.pem \
+            -subj   "/CN=localai"
       - name: Test nginx config with nginx -t
         # proxy_pass uses $upstream variables so nginx defers DNS to request
         # time — no --add-host stubs needed for the syntax check.
