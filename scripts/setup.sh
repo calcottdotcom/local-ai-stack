@@ -286,7 +286,11 @@ fi
 
 echo ""
 bold "Local domains (optional):"
-info "This adds *.localai entries to /etc/hosts and generates SSL certs with mkcert."
+info "This generates SSL certs with mkcert and adds *.localai entries to your hosts file."
+if [[ "$PLATFORM" == "wsl" ]]; then
+    info "On WSL: a UAC prompt will import the CA into the Windows cert store and update"
+    info "the Windows hosts file so your browser can reach https://*.localai."
+fi
 info "Gives you URLs like https://chat.localai instead of http://localhost:8086"
 echo ""
 

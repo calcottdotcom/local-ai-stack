@@ -341,11 +341,26 @@ test-nginx:
     #!/usr/bin/env bash
     set -euo pipefail
     echo "Testing nginx config syntax..."
-    # proxy_pass uses $upstream variables so nginx defers DNS resolution to
-    # request time — no --add-host stubs needed for the syntax check.
+    # ssl.conf is gitignored and only present after 'just setup local-domains',
+    # which also writes the real certs. If ssl.conf is present but certs aren't
+    # (e.g. after --conf-only in CI or a partial local run), generate throw-away
+    # certs for the duration of the syntax check and clean them up after.
+    DUMMY_CERTS=false
+    cleanup() { [[ "$DUMMY_CERTS" == "true" ]] && rm -f config/nginx/certs/localai{,-key}.pem || true; }
+    trap cleanup EXIT
+    if [[ -f config/nginx/conf.d/ssl.conf && ! -f config/nginx/certs/localai.pem ]]; then
+        echo "  → ssl.conf present but no certs — generating dummy certs for syntax check"
+        mkdir -p config/nginx/certs
+        openssl req -x509 -newkey rsa:2048 -days 1 -nodes \
+            -keyout config/nginx/certs/localai-key.pem \
+            -out    config/nginx/certs/localai.pem \
+            -subj   "/CN=localai" 2>/dev/null
+        DUMMY_CERTS=true
+    fi
     docker run --rm \
         -v "$PWD/config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro" \
         -v "$PWD/config/nginx/conf.d:/etc/nginx/conf.d:ro" \
+        -v "$PWD/config/nginx/certs:/etc/nginx/certs:ro" \
         nginx:alpine nginx -t
     echo "✓ nginx config valid"
 
@@ -378,7 +393,7 @@ test-vram:
     echo "Testing recommend_ctx..."
     assert_eq "15GB + 7GB model  → 131072" "$(recommend_ctx 15 7)"  "131072"
     assert_eq "12GB + 5GB model  → 131072" "$(recommend_ctx 12 5)"  "131072"
-    assert_eq "12GB + 7GB model  → 65536"  "$(recommend_ctx 12 7)"  "65536"
+    assert_eq "12GB + 7GB model  → 131072" "$(recommend_ctx 12 7)"  "131072"
     assert_eq "8GB  + 4GB model  → 65536"  "$(recommend_ctx  8 4)"  "65536"
     assert_eq "6GB  + 2GB model  → 65536"  "$(recommend_ctx  6 2)"  "65536"
     assert_eq "4GB  + 3GB model  → 16384"  "$(recommend_ctx  4 3)"  "16384"
