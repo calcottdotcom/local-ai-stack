@@ -45,7 +45,7 @@ detect_gpu() {
         vram=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits 2>/dev/null | head -1)
         if [[ -n "$vram" ]]; then
             GPU_TYPE=nvidia
-            VRAM_GB=$(( vram / 1024 ))
+            VRAM_GB=$(( (vram + 512) / 1024 ))
             return 0
         fi
     fi
@@ -79,7 +79,7 @@ recommend_model() {
 recommend_ctx() {
     local vram_gb=$1 model_size_gb=${2:-5}
     local free=$(( vram_gb - model_size_gb ))
-    if   (( free >= 6 )); then echo 131072
+    if   (( free >= 5 )); then echo 131072
     elif (( free >= 3 )); then echo 65536
     elif (( free >= 2 )); then echo 32768
     elif (( free >= 1 )); then echo 16384

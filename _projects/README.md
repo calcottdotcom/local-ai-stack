@@ -1,0 +1,1 @@
+This folder is mounted nito the pi and hermes containers. It is gitignored by this project but you can get the agents to create individual projects within here.

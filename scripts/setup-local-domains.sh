@@ -60,10 +60,11 @@ info "Generating certificates in $CERTS_DIR..."
 (
     cd "$CERTS_DIR"
     mkcert "${DOMAINS[@]}"
-    # mkcert outputs a single cert covering all domains
-    # Rename to predictable names for nginx
-    mv ./*+*.pem localai.pem   2>/dev/null || true
+    # mkcert outputs a single cert covering all domains.
+    # Rename to predictable names for nginx — key first so the cert glob
+    # no longer matches the key file when we rename the cert.
     mv ./*+*-key.pem localai-key.pem 2>/dev/null || true
+    mv ./*+*.pem     localai.pem     2>/dev/null || true
 )
 ok "Certificates generated"
 
@@ -107,14 +108,15 @@ ssl_certificate_key /etc/nginx/certs/localai-key.pem;
 ssl_protocols       TLSv1.2 TLSv1.3;
 ssl_ciphers         HIGH:!aNULL:!MD5;
 
-server { listen 443 ssl; server_name chat.localai;    location / { proxy_pass http://openwebui:8080;    proxy_set_header Host $host; proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection upgrade; proxy_read_timeout 300s; } }
-server { listen 443 ssl; server_name ollama.localai;  location / { proxy_pass http://ollama:11434;      proxy_set_header Host $host; proxy_read_timeout 300s; } }
-server { listen 443 ssl; server_name llamacpp.localai; location / { proxy_pass http://llamacpp:8080;   proxy_set_header Host $host; proxy_read_timeout 300s; } }
-server { listen 443 ssl; server_name searxng.localai; location / { proxy_pass http://searxng:8080;     proxy_set_header Host $host; } }
-server { listen 443 ssl; server_name hermes.localai;  location / { proxy_pass http://hermes-webui:8787; proxy_set_header Host $host; proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection upgrade; proxy_read_timeout 300s; } }
-server { listen 443 ssl; server_name www.localai;     location / { proxy_pass http://ubuntu-server:80;  proxy_set_header Host $host; } }
-server { listen 443 ssl; server_name comfyui.localai; location / { proxy_pass http://comfyui:8188;     proxy_set_header Host $host; proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection upgrade; } }
-server { listen 443 ssl; server_name design.localai;  location / { proxy_pass http://opendesign:7456;  proxy_set_header Host $host; proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection upgrade; } }
+server { listen 443 ssl; server_name chat.localai;    location / { set $upstream http://openwebui:8080;    proxy_pass $upstream; proxy_set_header Host $host; proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection upgrade; proxy_read_timeout 300s; } }
+server { listen 443 ssl; server_name ollama.localai;  location / { set $upstream http://ollama:11434;      proxy_pass $upstream; proxy_set_header Host $host; proxy_read_timeout 300s; } }
+# TODO: Uncomment when llama.cpp service is implemented
+# server { listen 443 ssl; server_name llamacpp.localai; location / { set $upstream http://llamacpp:8080; proxy_pass $upstream; proxy_set_header Host $host; proxy_read_timeout 300s; } }
+server { listen 443 ssl; server_name searxng.localai; location / { set $upstream http://searxng:8080;     proxy_pass $upstream; proxy_set_header Host $host; } }
+server { listen 443 ssl; server_name hermes.localai;  location / { set $upstream http://hermes:8787;      proxy_pass $upstream; proxy_set_header Host $host; proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection upgrade; proxy_read_timeout 300s; } }
+server { listen 443 ssl; server_name www.localai;     location / { set $upstream http://ubuntu-server:80; proxy_pass $upstream; proxy_set_header Host $host; } }
+server { listen 443 ssl; server_name comfyui.localai; location / { set $upstream http://comfyui:8188;     proxy_pass $upstream; proxy_set_header Host $host; proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection upgrade; } }
+server { listen 443 ssl; server_name design.localai;  location / { set $upstream http://pi:7456;         proxy_pass $upstream; proxy_set_header Host $host; proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection upgrade; } }
 NGINX
 
 ok "SSL config written"

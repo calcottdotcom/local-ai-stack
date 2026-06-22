@@ -18,6 +18,7 @@ services:
     environment:
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://ollama:11434}
       - OPENAI_API_BASE_URL=${OPENAI_API_BASE_URL:-}
+      - DEFAULT_MODELS=${OLLAMA_MODEL:-}
       - WEBUI_AUTH=false
       - ENABLE_WEB_SEARCH=true
       - WEB_SEARCH_ENGINE=searxng
@@ -50,12 +51,15 @@ services:
       - "${HERMES_PORT:-8787}:8787"
     volumes:
       - hermes-home:/root
+      - ./config/skills:/opt/shared-skills:ro
+      - ./_projects:/root/projects
     environment:
       - INFERENCE_BASE_URL=${INFERENCE_BASE_URL:-http://ollama:11434/v1}
       - OPENAI_API_BASE_URL=${INFERENCE_BASE_URL:-http://ollama:11434/v1}
       - INFERENCE_PROVIDER=${INFERENCE_PROVIDER:-ollama}
       - INFERENCE_MODEL=${INFERENCE_MODEL:-}
       - OLLAMA_MODEL=${OLLAMA_MODEL:-}
+      - OLLAMA_CTX=${OLLAMA_CTX:-}
       - LLAMACPP_MODEL=${LLAMACPP_MODEL:-}
       - LLAMACPP_CTX=${LLAMACPP_CTX:-65536}
       - HERMES_WEBUI_HOST=0.0.0.0
@@ -70,6 +74,12 @@ services:
   pi:
     build: ./docker/pi
     container_name: pi
+    ports:
+      - "${OPENDESIGN_PORT:-7456}:7456"
+    volumes:
+      - ./config/skills:/opt/shared-skills:ro
+      - opendesign-data:/app/.od
+      - ./_projects:/home/pi/projects
     environment:
       - INFERENCE_BASE_URL=${INFERENCE_BASE_URL:-http://ollama:11434/v1}
       - OPENAI_BASE_URL=${INFERENCE_BASE_URL:-http://ollama:11434/v1}
@@ -77,8 +87,10 @@ services:
       - INFERENCE_PROVIDER=${INFERENCE_PROVIDER:-ollama}
       - INFERENCE_MODEL=${INFERENCE_MODEL:-}
       - OLLAMA_MODEL=${OLLAMA_MODEL:-}
+      - OLLAMA_CTX=${OLLAMA_CTX:-}
       - LLAMACPP_MODEL=${LLAMACPP_MODEL:-}
       - LLAMACPP_CTX=${LLAMACPP_CTX:-65536}
+      - "OD_API_TOKEN=${OD_API_TOKEN:?OD_API_TOKEN must be set (generate with: openssl rand -hex 32)}"
     networks:
       - local-ai-net
     restart: unless-stopped
@@ -88,19 +100,6 @@ services:
     container_name: ubuntu-server
     ports:
       - "${SERVER_PORT:-8087}:80"
-    networks:
-      - local-ai-net
-    restart: unless-stopped
-
-  opendesign:
-    image: ${OPEN_DESIGN_IMAGE:-vanjayak/open-design:latest}
-    container_name: opendesign
-    ports:
-      - "${OPENDESIGN_PORT:-7456}:7456"
-    volumes:
-      - opendesign-data:/app/.od
-    environment:
-      - "OD_API_TOKEN=${OD_API_TOKEN:?OD_API_TOKEN must be set (generate with: openssl rand -hex 32)}"
     networks:
       - local-ai-net
     restart: unless-stopped

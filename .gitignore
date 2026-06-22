@@ -6,3 +6,7 @@ config/nginx/certs/
 
 # OS
 .DS_Store
+
+# Agent project workspace — keep the README, ignore everything else
+_projects/*
+!_projects/README.md

@@ -102,9 +102,10 @@ if [[ "$PROVIDER" == "ollama" ]]; then
         info "Storage: docker volume 'local-ai-stack_ollama-models'"
     fi
 
-    # Track the active model in .env so agents pick it up on next start
+    # Track the active model and its context window in .env so agents pick them up on next start
     sedi "s|^OLLAMA_MODEL=.*|OLLAMA_MODEL=${TAGGED_MODEL}|" "$ROOT_DIR/.env"
     sedi "s|^INFERENCE_MODEL=.*|INFERENCE_MODEL=${TAGGED_MODEL}|" "$ROOT_DIR/.env"
+    sedi "s|^OLLAMA_CTX=.*|OLLAMA_CTX=${CTX}|" "$ROOT_DIR/.env"
 
     # Restart running agent containers so they pick up the new model immediately
     for agent in hermes pi; do
