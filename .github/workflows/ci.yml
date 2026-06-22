@@ -117,7 +117,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Generate dummy certs for syntax check
+
+      - name: Test HTTP-only config syntax (before SSL setup)
+        # ssl.conf is gitignored and not present yet — tests plain services.conf.
+        # proxy_pass uses $upstream variables so nginx defers DNS to request
+        # time — no --add-host stubs needed for the syntax check.
+        run: |
+          docker run --rm \
+            -v "$PWD/config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro" \
+            -v "$PWD/config/nginx/conf.d:/etc/nginx/conf.d:ro" \
+            nginx:alpine nginx -t
+
+      - name: Generate dummy certs for SSL syntax check
         # ssl.conf references these paths; certs are gitignored so we generate
         # throw-away self-signed certs just to satisfy nginx -t.
         run: |
@@ -126,9 +137,13 @@ jobs:
             -keyout config/nginx/certs/localai-key.pem \
             -out    config/nginx/certs/localai.pem \
             -subj   "/CN=localai"
-      - name: Test nginx config with nginx -t
-        # proxy_pass uses $upstream variables so nginx defers DNS to request
-        # time — no --add-host stubs needed for the syntax check.
+
+      - name: Generate SSL nginx config
+        # --conf-only skips mkcert, /etc/hosts, and nginx reload — writes
+        # ssl.conf and updates services.conf with HTTP→HTTPS redirects.
+        run: bash scripts/setup-local-domains.sh --conf-only
+
+      - name: Test SSL config syntax
         run: |
           docker run --rm \
             -v "$PWD/config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro" \

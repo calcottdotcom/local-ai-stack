@@ -10,7 +10,7 @@ There's loads of options for running local LLMs as well as utilities that can si
 * A generalist AI agent with a built-in web UI, which you can use to get things done. We'll use [Hermes](https://github.com/nousresearch/hermes-agent) with [Hermes Web UI](https://github.com/nesquena/hermes-webui) embedded in the same container
 * A coding AI agent, lightweight and dedicated to coding as opposed to the generalist. We'll use [Pi Coding Agent](https://github.com/earendil-works/pi)
 * A general web server which the agents can ssh into to run things. We'll use an ubuntu container - asking the agents to setup nginx etc.
-* A reverse proxy to allow for domain mapping to these container services on different ports. We'll use nginx. Along with this we have a wrapper for local domains and SSL using [mkcert](https://github.com/filosottile/mkcert) and your `/etc/hosts` file (optional but makes things feel more like real-world services!).
+* A reverse proxy to allow for domain mapping to these container services on different ports. We'll use nginx. Along with this we have a wrapper for local domains and SSL using [mkcert](https://github.com/filosottile/mkcert) and your hosts file (optional but makes things feel more like real-world services!). On Windows/WSL this also imports the mkcert CA into the Windows certificate store so browsers trust the certs.
 * A web-design tool using AI, using [open design](https://github.com/nexu-io/open-design) — runs inside the Pi container since it relies on an agent to operate
 * A simple media-generation workflow service, using [comfyui](https://github.com/comfy-org/comfyui).
 * Some simple containers wrapped behind just commands to prove that all the GPU passthrough is working (e.g. `just gpucheck`) which use things like nvtop, nvidia-smi etc.
@@ -116,14 +116,14 @@ The setup wizard detects macOS, estimates usable RAM for model sizing (40% of to
 
 ## Getting started
 ### Setup
-Just run `just setup` for an interactive setup process which will analyse the requirements from above and your GPU / system to recommend you some models and setup. It will also offer to install mkcert and modify your /etc/hosts file.
+Just run `just setup` for an interactive setup process which will analyse the requirements from above and your GPU / system to recommend you some models and setup. It will also offer to install mkcert and configure local domains.
 
 ## Running the stack
 All of the containers belong to the same docker compose stack (named `local-ai-stack`) and there's a few options here:
 * `just up ollama` runs the stack with ollama as the inference provider
 * `just up llamacpp` runs the stack with llama.cpp as the inference provider *(coming soon — not yet recommended for general use)*
 * `just up comfy` runs the comfyui service. Note that if you only have one GPU you're unlikely to be able to run this alongside llamacpp
-* `just setup local-domains` will modify your /etc/hosts file and configure mkcert
+* `just setup local-domains` configures local domains and SSL — installs mkcert, generates certs, and adds `*.localai` entries to your hosts file. On **Linux/macOS** this edits `/etc/hosts` (requires `sudo`). On **Windows/WSL** it triggers a single UAC prompt to both add the entries to the Windows hosts file (so browsers resolve the domains) and import the mkcert CA into the Windows certificate store (so browsers trust the certs).
 
 These commands automatically rewire the config files for OpenWebUI, Hermes, Pi etc to use the correct inference provider but running them may restart your service.
 
