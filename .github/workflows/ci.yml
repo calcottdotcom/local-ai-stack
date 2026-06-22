@@ -124,6 +124,7 @@ jobs:
           docker run --rm \
             -v "$PWD/config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro" \
             -v "$PWD/config/nginx/conf.d:/etc/nginx/conf.d:ro" \
+            -v "$PWD/config/nginx/certs:/etc/nginx/certs:ro" \
             nginx:alpine nginx -t
 
   # ── Ollama CPU smoke test ─────────────────────────────────────────────────
