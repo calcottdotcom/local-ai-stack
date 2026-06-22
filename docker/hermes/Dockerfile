@@ -66,7 +66,31 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     # Media
     ffmpeg \
     imagemagick \
+    # Chromium runtime deps (required by CloakBrowser)
+    libasound2t64 \
+    libatk-bridge2.0-0 \
+    libatk1.0-0 \
+    libcairo2 \
+    libcups2 \
+    libdrm2 \
+    libgbm1 \
+    libglib2.0-0 \
+    libnspr4 \
+    libnss3 \
+    libpango-1.0-0 \
+    libvulkan1 \
+    libxdamage1 \
+    libxext6 \
+    libxfixes3 \
+    libxkbcommon0 \
+    libxrandr2 \
+    xdg-utils \
     && rm -rf /var/lib/apt/lists/*
+
+# CloakBrowser — stealth Chromium for bypassing bot detection
+RUN python3 -m venv /opt/cloakbrowser-venv \
+    && /opt/cloakbrowser-venv/bin/pip install --no-cache-dir cloakbrowser mcp-cloakbrowser
+ENV PATH="/opt/cloakbrowser-venv/bin:${PATH}"
 
 # Go — official binary, multi-arch
 RUN ARCH=$(uname -m) && \

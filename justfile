@@ -141,8 +141,8 @@ down:
     fi
     {{dc}} "${compose_args[@]}" down
 
-# Restart a single service (e.g. just restart openwebui)
-restart service:
+# Restart a service (e.g. just restart openwebui) or all services (just restart all)
+restart service="all":
     #!/usr/bin/env bash
     source .env 2>/dev/null || true
     source scripts/gpu-detect.sh
@@ -152,7 +152,11 @@ restart service:
     if [[ "$PLATFORM" != "mac" || "$PROVIDER" != "ollama" ]]; then
         compose_args+=(-f "{{cf}}docker-compose.${PROVIDER}.yml" -f "{{cf}}docker-compose.gpu-${GPU}-${PROVIDER}.yml")
     fi
-    {{dc}} "${compose_args[@]}" restart {{service}}
+    target="{{service}}"
+    [[ "$target" == "all" ]] && target=""
+    restart_args=()
+    [[ -n "$target" ]] && restart_args+=("$target")
+    {{dc}} "${compose_args[@]}" restart "${restart_args[@]}"
 
 # Show status of all local-ai-stack containers
 status:

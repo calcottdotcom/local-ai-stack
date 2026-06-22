@@ -7,8 +7,9 @@ BASE_URL="${INFERENCE_BASE_URL:-http://ollama:11434/v1}"
 PROVIDER="${INFERENCE_PROVIDER:-ollama}"
 MODEL="${INFERENCE_MODEL:-}"
 OLLAMA_MDL="${OLLAMA_MODEL:-$MODEL}"
+OLLAMA_CTX="${OLLAMA_CTX:-}"
 LLAMACPP_MDL="${LLAMACPP_MODEL:-}"
-CTX="${LLAMACPP_CTX:-65536}"
+LLAMACPP_CTX="${LLAMACPP_CTX:-65536}"
 
 [[ "$PROVIDER" == "llamacpp" ]] && HERMES_PROVIDER="custom" || HERMES_PROVIDER="ollama"
 
@@ -18,7 +19,12 @@ cfg model.default  "$MODEL"
 cfg model.provider "$HERMES_PROVIDER"
 cfg model.base_url "$BASE_URL"
 cfg model.api_key  ""
-[[ "$PROVIDER" == "llamacpp" ]] && cfg model.context_length "$CTX"
+if [[ "$PROVIDER" == "llamacpp" ]]; then
+    cfg model.context_length "$LLAMACPP_CTX"
+elif [[ -n "$OLLAMA_CTX" ]]; then
+    cfg model.context_length "$OLLAMA_CTX"
+fi
+cfg compression.threshold 0.6
 
 if [[ -n "$OLLAMA_MDL" ]]; then
     cfg model_aliases.ollama.model    "$OLLAMA_MDL"
@@ -30,7 +36,7 @@ if [[ -n "$LLAMACPP_MDL" ]]; then
     cfg model_aliases.llamacpp.model           "$LLAMACPP_MDL"
     cfg model_aliases.llamacpp.provider        "custom"
     cfg model_aliases.llamacpp.base_url        "http://llamacpp:8080/v1"
-    cfg model_aliases.llamacpp.context_length  "$CTX"
+    cfg model_aliases.llamacpp.context_length  "$LLAMACPP_CTX"
 fi
 
 # Write SOUL.md — loaded by hermes with every message, no restart needed.
@@ -52,6 +58,14 @@ The file is read on every container start and those packages are reinstalled aut
 
 For Python dependencies, create a venv inside your workspace (e.g. `python3 -m venv ~/workspace/project/venv`) — the workspace is on the persistent volume so packages installed there survive restarts.
 SOUL
+
+# ── Skills ────────────────────────────────────────────────────────────────────
+# Sync shared skills from the project volume mount into the hermes skills dir.
+# Skills are on-demand: loaded via skills_list() / skill_view(), zero tokens
+# until invoked, and available across all profiles.
+if [[ -d /opt/shared-skills ]]; then
+    cp -r /opt/shared-skills/. /root/.hermes/skills/
+fi
 
 # Reinstall any packages the agent has persisted across restarts
 APT_PACKAGES=/root/.hermes/apt-packages.txt

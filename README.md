@@ -11,7 +11,7 @@ There's loads of options for running local LLMs as well as utilities that can si
 * A coding AI agent, lightweight and dedicated to coding as opposed to the generalist. We'll use [Pi Coding Agent](https://github.com/earendil-works/pi)
 * A general web server which the agents can ssh into to run things. We'll use an ubuntu container - asking the agents to setup nginx etc.
 * A reverse proxy to allow for domain mapping to these container services on different ports. We'll use nginx. Along with this we have a wrapper for local domains and SSL using [mkcert](https://github.com/filosottile/mkcert) and your `/etc/hosts` file (optional but makes things feel more like real-world services!).
-* A web-design tool using AI, using [open design](https://github.com/nexu-io/open-design)
+* A web-design tool using AI, using [open design](https://github.com/nexu-io/open-design) — runs inside the Pi container since it relies on an agent to operate
 * A simple media-generation workflow service, using [comfyui](https://github.com/comfy-org/comfyui).
 * Some simple containers wrapped behind just commands to prove that all the GPU passthrough is working (e.g. `just gpucheck`) which use things like nvtop, nvidia-smi etc.
 
@@ -147,7 +147,7 @@ The services that run by default are:
 * Hermes web ui on 8787 / https://hermes.localai
 * General server for ai output: localhost:8087 / https://www.localai
 * ComfyUI for media generation on localhost:8188 / https://comfyui.localai
-* OpenDesign for web design on localhost:7456 / https://design.localai
+* OpenDesign for web design on localhost:7456 / https://design.localai (served by the Pi container)
 * Reverse proxy runs on 80 and 443 to handle custom domains with SSL.
 
 The quickest test to ensure the basics are working is to run `just up ollama` then use the just command to `just download ollama model qwen3.5:9b`. This will take a few minutes depending on your internet speed.
@@ -167,6 +167,9 @@ http://searxng:8888/search?q=local%20ai&categories=news&format=rss
 Test that it works and let me know if not!
 ```
 From then on, get the agent to fix itself with things like this.
+
+### Project files
+The `_projects/` folder at the repo root is bind-mounted into both agent containers (`/home/pi/projects` in pi, `/root/projects` in hermes), so files either agent creates there are visible on your host and shared between the two. It's gitignored apart from its own README, so ask the agents to create new work under `_projects/<name>/`.
 
 ## Technical notes
 * All docker containers communicate with each other on their own docker network (local-ai-net) rather than going to the host and back in. This means inter-container communication happens on default ports but the EXPOSED ports to the host are the ones listed above.
