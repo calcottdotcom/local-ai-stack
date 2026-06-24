@@ -379,6 +379,87 @@ The MTP head (`mtp-gemma-4-12B-it.gguf`, 242 MB) is required for `llamacpp-tq` w
 
 ---
 
+### 6. GHA CI — llama.cpp test coverage
+
+Current CI has five jobs. Here's what's missing for llama.cpp and what's actually feasible without GPU hardware.
+
+**Gap 1 — `docker/llamacpp-tq/Dockerfile` is not in the hadolint matrix.**
+
+The `dockerfile-lint` job currently lists hermes, pi, and ubuntu-server. Add `docker/llamacpp-tq/Dockerfile` to the strategy matrix. This is a free win — no GPU needed, pure linting.
+
+**Gap 2 — `llamacpp-tq` compose files are not in the compose-syntax job.**
+
+The `compose-syntax` job covers `llamacpp` (standard) but not `llamacpp-tq`. Add the llamacpp-tq combination:
+```yaml
+- name: base + llamacpp-tq (nvidia)
+  run: |
+    docker compose --project-directory . \
+      -f docker/docker-compose.yml \
+      -f docker/docker-compose.llamacpp-tq.yml \
+      -f docker/docker-compose.gpu-nvidia-llamacpp-tq.yml \
+      config --quiet
+```
+(These compose files need to exist first — see task 4 above.)
+
+**Gap 3 — no llamacpp server smoke test.**
+
+The Ollama job (`inference-smoke`) starts the container and hits the health endpoint. We can do the same for llamacpp using the CPU-only image variant (`ghcr.io/ggml-org/llama.cpp:server`, no `-cuda` suffix) plus a tiny GGUF. The `stories260K.gguf` from `ggml-org/models` on HuggingFace is 460 KB — fast to download, works on CPU, and exercises the startup → health → completion path:
+
+```yaml
+inference-smoke-llamacpp:
+  name: Inference — llamacpp smoke (CPU)
+  runs-on: ubuntu-latest
+  steps:
+    - uses: actions/checkout@v4
+
+    - name: Download tiny test model
+      run: |
+        mkdir -p /tmp/models
+        curl -L -o /tmp/models/test.gguf \
+          https://huggingface.co/ggml-org/models/resolve/main/tinyllamas/stories260K.gguf
+
+    - name: Start llamacpp server (CPU mode, no CUDA)
+      run: |
+        docker run -d --name llamacpp-ci \
+          -v /tmp/models:/models \
+          -p 8089:8080 \
+          ghcr.io/ggml-org/llama.cpp:server \
+          --model /models/test.gguf \
+          --ctx-size 512 \
+          --n-gpu-layers 0
+
+    - name: Wait for health endpoint
+      run: |
+        for i in $(seq 1 30); do
+          curl -sf http://localhost:8089/health && break
+          [[ $i -eq 30 ]] && { docker logs llamacpp-ci; exit 1; }
+          sleep 2
+        done
+
+    - name: Verify completion endpoint
+      run: |
+        curl -sf http://localhost:8089/completion \
+          -H 'Content-Type: application/json' \
+          -d '{"prompt":"Once upon a time","n_predict":10,"temperature":0}' \
+          | python3 -m json.tool
+
+    - name: Stop container
+      if: always()
+      run: docker rm -f llamacpp-ci || true
+```
+
+**Note: use `ghcr.io/ggml-org/llama.cpp:server` (not `:server-cuda`) in CI.** The CUDA image dynamically links CUDA libraries — without GPU drivers it fails to launch. The CPU image is a different build tag from the same upstream project. This means CI tests the llamacpp API surface but not the CUDA path. That's acceptable — the CUDA path is what the benchmarks above are for.
+
+**What CI cannot do:**
+- VRAM measurements — `nvidia-smi` isn't available; any reading would be garbage
+- GPU layer / offload testing — the `--n-gpu-layers` flag does nothing without a GPU driver
+- Performance / throughput checks — CPU inference on tiny models is not representative
+- TurboQuant build verification — the `llamacpp-tq` image takes 30+ minutes to compile with CUDA; impractical to build in CI. Lint the Dockerfile instead (Gap 1 above) and trust local builds.
+
+**The `vram-calculations` job is the right pattern for testing `gpu-detect.sh` logic.** It sources the script and calls the pure-bash functions with known inputs — no GPU needed. Extend this job when `recommend_llamacpp_model()` and `recommend_llamacpp_config()` are added (task 1 above) and mirror those tests in `ci.yml`.
+
+---
+
 ### 5. `just bench` — consolidate with `bench-rd.sh`
 
 `just bench` currently calls `scripts/bench-context.sh`. The R&D script `scripts/bench-rd.sh` is more capable (multiple phases, Qwen3.5, MTP). Decide:
