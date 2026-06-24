@@ -225,7 +225,11 @@ if [[ "$PLATFORM" == "mac" ]]; then
 else
     bold "Select a model to download (${VRAM_GB}GB VRAM):"
 fi
-info "Recommended: $(recommend_model "$VRAM_GB")"
+if [[ "$PROVIDER" == "llamacpp" ]]; then
+    info "Recommended: $(recommend_llamacpp_model "$VRAM_GB")"
+else
+    info "Recommended: $(recommend_model "$VRAM_GB")"
+fi
 info "Use ↑/↓ arrows and Enter to select"
 echo ""
 
@@ -257,11 +261,24 @@ if [[ "$PROVIDER" == "ollama" ]]; then
             ;;
     esac
 else
-    if   (( VRAM_GB >= 12 )); then DEFAULT_MODEL="google/gemma-4-12B-it-qat-q4_0-gguf"
-    else                           DEFAULT_MODEL="Qwen/Qwen2.5-7B-Instruct-GGUF"
+    # llamacpp: options are HuggingFace repos; download-model.sh handles the rest
+    _PICK_OPTIONS=()
+    if (( VRAM_GB >= 12 )); then
+        _PICK_OPTIONS=(
+            "unsloth/gemma-4-26B-A4B-it-qat-GGUF"
+            "unsloth/gemma-4-12b-it-qat-GGUF"
+        )
+    elif (( VRAM_GB >= 8 )); then
+        _PICK_OPTIONS=(
+            "unsloth/gemma-4-12b-it-qat-GGUF"
+            "Qwen/Qwen2.5-7B-Instruct-GGUF"
+        )
+    else
+        _PICK_OPTIONS=(
+            "Qwen/Qwen2.5-7B-Instruct-GGUF"
+        )
     fi
-    _PICK_OPTIONS=(
-        "$DEFAULT_MODEL"
+    _PICK_OPTIONS+=(
         "Enter HuggingFace repo manually..."
         "Skip — I'll download a model later"
     )
@@ -270,7 +287,7 @@ else
 
     case "$PICK_RESULT" in
         "Enter HuggingFace repo manually...")
-            MODEL=$(ask "HuggingFace repo (e.g. Qwen/Qwen2.5-7B-Instruct-GGUF):")
+            MODEL=$(ask "HuggingFace repo (e.g. unsloth/gemma-4-26B-A4B-it-qat-GGUF):")
             ;;
         "Skip — I'll download a model later")
             MODEL=""

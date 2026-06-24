@@ -12,6 +12,7 @@ MODEL="${2:-}"
 bold() { echo -e "\033[1m$*\033[0m"; }
 info() { echo -e "  \033[36m→\033[0m $*"; }
 ok()   { echo -e "  \033[32m✓\033[0m $*"; }
+warn() { echo -e "  \033[33m!\033[0m $*"; }
 die()  { echo -e "  \033[31m✗\033[0m $*" >&2; exit 1; }
 
 [[ -n "$PROVIDER" ]] || die "Usage: $0 <ollama|llamacpp> <model>"
@@ -119,18 +120,52 @@ if [[ "$PROVIDER" == "ollama" ]]; then
 # LLAMA.CPP
 # ─────────────────────────────────────────────────────────────────────────
 elif [[ "$PROVIDER" == "llamacpp" ]]; then
-    # Check if a GGUF already exists in the volume to avoid re-downloading
-    existing_gguf=$(docker run --rm \
+    # Check if the target GGUF already exists in the volume to avoid re-downloading.
+    # Extract a size token (e.g. "26b", "9b") from the repo name to match against volume files.
+    repo_size_token=$(basename "$MODEL" | tr '[:upper:]' '[:lower:]' | grep -oE '[0-9]+b' | head -1)
+    all_ggufs=$(docker run --rm \
         -v local-ai-stack_llamacpp-models:/models \
-        alpine sh -c "ls /models/*.gguf 2>/dev/null | head -1" 2>/dev/null || true)
-    if [[ -n "$existing_gguf" ]]; then
-        existing_name=$(basename "$existing_gguf")
+        alpine sh -c "find /models -maxdepth 1 -name '*.gguf' ! -name 'mtp-*' 2>/dev/null" \
+        2>/dev/null || true)
+
+    matched_gguf=""
+    if [[ -n "$all_ggufs" && -n "$repo_size_token" ]]; then
+        while IFS= read -r f; do
+            if echo "$f" | tr '[:upper:]' '[:lower:]' | grep -qE "(^|/)${repo_size_token}([^0-9]|$)|[^0-9]${repo_size_token}([^0-9]|$)"; then
+                matched_gguf="$f"
+                break
+            fi
+        done <<< "$all_ggufs"
+    fi
+    # Fallback: if no size match (or no size token), take the first GGUF found
+    [[ -z "$matched_gguf" && -n "$all_ggufs" ]] && matched_gguf=$(echo "$all_ggufs" | head -1)
+
+    if [[ -n "$matched_gguf" ]]; then
+        existing_name=$(basename "$matched_gguf")
         warn "Found existing model in volume: $existing_name"
         read -rp "  Re-download and replace? [y/N]: " OVERWRITE
         OVERWRITE=${OVERWRITE:-N}
         if [[ ! "$OVERWRITE" =~ ^[Yy]$ ]]; then
             ok "Keeping existing model: $existing_name"
-            info "If you need a different context size, update LLAMACPP_CTX in .env manually."
+            GGUF_FILENAME="$existing_name"
+            GPU_LAYERS=$(recommend_llamacpp_gpu_layers "$VRAM_GB" "$GGUF_FILENAME")
+            CTX=$(recommend_llamacpp_ctx "$VRAM_GB" "$GGUF_FILENAME")
+            if echo "$GGUF_FILENAME" | grep -qiE '26b|A4B'; then KV_TYPE="q4_0"; else KV_TYPE="f16"; fi
+            info "VRAM: ${VRAM_GB}GB → GPU layers: ${GPU_LAYERS}, context: ${CTX}, KV type: ${KV_TYPE}"
+            grep -q '^LLAMACPP_KV_TYPE=' "$ROOT_DIR/.env" || echo "LLAMACPP_KV_TYPE=" >> "$ROOT_DIR/.env"
+            sedi "s|^LLAMACPP_MODEL=.*|LLAMACPP_MODEL=${GGUF_FILENAME}|"         "$ROOT_DIR/.env"
+            sedi "s|^LLAMACPP_CTX=.*|LLAMACPP_CTX=${CTX}|"                      "$ROOT_DIR/.env"
+            sedi "s|^LLAMACPP_GPU_LAYERS=.*|LLAMACPP_GPU_LAYERS=${GPU_LAYERS}|" "$ROOT_DIR/.env"
+            sedi "s|^LLAMACPP_KV_TYPE=.*|LLAMACPP_KV_TYPE=${KV_TYPE}|"          "$ROOT_DIR/.env"
+            sedi "s|^LLAMACPP_EXTRA_ARGS=.*|LLAMACPP_EXTRA_ARGS=|"              "$ROOT_DIR/.env"
+            ok "Set LLAMACPP_MODEL=$GGUF_FILENAME, LLAMACPP_GPU_LAYERS=$GPU_LAYERS, LLAMACPP_CTX=$CTX, LLAMACPP_KV_TYPE=$KV_TYPE in .env"
+            for agent in hermes pi; do
+                if docker ps -q --filter name="^${agent}$" | grep -q .; then
+                    info "Restarting ${agent} to pick up new model..."
+                    docker restart "$agent" > /dev/null
+                fi
+            done
+            info "Start the stack with: just up llamacpp"
             exit 0
         fi
     fi
@@ -187,25 +222,35 @@ else:
     ok "Downloaded: $GGUF_FILENAME"
     info "Storage: docker volume 'local-ai-stack_llamacpp-models'"
 
-    # Calculate context window
-    if   echo "$GGUF_FILENAME" | grep -qi '70b\|72b'; then MODEL_SIZE_GB=40
-    elif echo "$GGUF_FILENAME" | grep -qi '30b\|32b\|34b'; then MODEL_SIZE_GB=19
-    elif echo "$GGUF_FILENAME" | grep -qi '12b\|13b\|14b'; then MODEL_SIZE_GB=7
-    elif echo "$GGUF_FILENAME" | grep -qi '9b'; then MODEL_SIZE_GB=5
-    elif echo "$GGUF_FILENAME" | grep -qi '7b\|8b'; then MODEL_SIZE_GB=4
-    elif echo "$GGUF_FILENAME" | grep -qi '4b\|3b'; then MODEL_SIZE_GB=2
-    else MODEL_SIZE_GB=4
+    # Derive GPU layers, context, and KV type from model filename + measured VRAM data
+    GPU_LAYERS=$(recommend_llamacpp_gpu_layers "$VRAM_GB" "$GGUF_FILENAME")
+    CTX=$(recommend_llamacpp_ctx "$VRAM_GB" "$GGUF_FILENAME")
+    # MoE models (26B A4B): q4_0 KV saves ~1 GB VRAM at large context; dense models: f16
+    if echo "$GGUF_FILENAME" | grep -qiE '26b|A4B'; then
+        KV_TYPE="q4_0"
+    else
+        KV_TYPE="f16"
     fi
+    info "VRAM: ${VRAM_GB}GB → GPU layers: ${GPU_LAYERS}, context: ${CTX}, KV type: ${KV_TYPE}"
 
-    CTX=$(recommend_ctx "$VRAM_GB" "$MODEL_SIZE_GB")
-    info "VRAM: ${VRAM_GB}GB, model ~${MODEL_SIZE_GB}GB → recommended context: $CTX tokens"
+    # Update .env — add LLAMACPP_KV_TYPE line if missing (upgrading from older .env)
+    grep -q '^LLAMACPP_KV_TYPE=' "$ROOT_DIR/.env" || echo "LLAMACPP_KV_TYPE=" >> "$ROOT_DIR/.env"
+    sedi "s|^LLAMACPP_MODEL=.*|LLAMACPP_MODEL=${GGUF_FILENAME}|"           "$ROOT_DIR/.env"
+    sedi "s|^LLAMACPP_CTX=.*|LLAMACPP_CTX=${CTX}|"                        "$ROOT_DIR/.env"
+    sedi "s|^LLAMACPP_GPU_LAYERS=.*|LLAMACPP_GPU_LAYERS=${GPU_LAYERS}|"   "$ROOT_DIR/.env"
+    sedi "s|^LLAMACPP_KV_TYPE=.*|LLAMACPP_KV_TYPE=${KV_TYPE}|"            "$ROOT_DIR/.env"
+    sedi "s|^LLAMACPP_EXTRA_ARGS=.*|LLAMACPP_EXTRA_ARGS=|"                "$ROOT_DIR/.env"
 
-    # Update .env
-    sedi "s|^LLAMACPP_MODEL=.*|LLAMACPP_MODEL=${GGUF_FILENAME}|" "$ROOT_DIR/.env"
-    sedi "s|^LLAMACPP_CTX=.*|LLAMACPP_CTX=${CTX}|" "$ROOT_DIR/.env"
-
-    ok "Set LLAMACPP_MODEL=$GGUF_FILENAME, LLAMACPP_CTX=$CTX in .env"
+    ok "Set LLAMACPP_MODEL=$GGUF_FILENAME, LLAMACPP_GPU_LAYERS=$GPU_LAYERS, LLAMACPP_CTX=$CTX, LLAMACPP_KV_TYPE=$KV_TYPE in .env"
     info "Start the stack with: just up llamacpp"
+
+    # Restart running agent containers so they pick up the new model immediately
+    for agent in hermes pi; do
+        if docker ps -q --filter name="^${agent}$" | grep -q .; then
+            info "Restarting ${agent} to pick up new model..."
+            docker restart "$agent" > /dev/null
+        fi
+    done
 
 else
     die "Unknown provider: $PROVIDER. Use 'ollama' or 'llamacpp'"

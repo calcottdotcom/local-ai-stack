@@ -87,6 +87,55 @@ recommend_ctx() {
     fi
 }
 
+# llama.cpp-specific recommendations based on benchmark data (docs/benchmarks/llamacpp-rtx4080-12gb.md)
+
+recommend_llamacpp_model() {
+    local vram_gb=$1
+    if   (( vram_gb >= 12 )); then echo "unsloth/gemma-4-26B-A4B-it-qat-GGUF"
+    elif (( vram_gb >=  8 )); then echo "Qwen/Qwen2.5-7B-Instruct-GGUF"
+    elif (( vram_gb >=  5 )); then echo "Qwen/Qwen2.5-7B-Instruct-GGUF"
+    else                           echo "none"
+    fi
+}
+
+# Number of transformer layers to put on GPU.
+# 26B A4B is MoE (30 layers) — needs partial CPU offload to stay under VRAM budget.
+# All other supported models fit fully on GPU.
+recommend_llamacpp_gpu_layers() {
+    local vram_gb=$1 gguf=${2:-}
+    if echo "$gguf" | grep -qiE '26b|A4B'; then
+        if   (( vram_gb >= 12 )); then echo 23
+        elif (( vram_gb >=  8 )); then echo 16
+        else                           echo 10
+        fi
+    else
+        echo 99
+    fi
+}
+
+# Context window sized from measured VRAM headroom per model/VRAM tier.
+recommend_llamacpp_ctx() {
+    local vram_gb=$1 gguf=${2:-}
+    if echo "$gguf" | grep -qiE '26b|A4B'; then
+        if   (( vram_gb >= 12 )); then echo 98304
+        elif (( vram_gb >=  8 )); then echo 65536
+        else                           echo 32768
+        fi
+    elif echo "$gguf" | grep -qi '12b'; then
+        if   (( vram_gb >= 12 )); then echo 196608
+        elif (( vram_gb >=  8 )); then echo 65536
+        else                           echo 32768
+        fi
+    elif echo "$gguf" | grep -qi '9b'; then
+        if   (( vram_gb >= 12 )); then echo 131072
+        elif (( vram_gb >=  8 )); then echo 65536
+        else                           echo 32768
+        fi
+    else
+        recommend_ctx "$vram_gb" 5
+    fi
+}
+
 # Run standalone
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     detect_gpu
