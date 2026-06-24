@@ -1,0 +1,31 @@
+volumes:
+  llamacpp-models:
+
+services:
+  llamacpp:
+    build: ./docker/llamacpp-tq
+    image: local-ai-stack/llamacpp-tq
+    container_name: llamacpp
+    ports:
+      - "${LLAMACPP_PORT:-8089}:8080"
+    volumes:
+      - llamacpp-models:/models
+    command: >
+      --model /models/${LLAMACPP_MODEL}
+      --host 0.0.0.0
+      --port 8080
+      --ctx-size ${LLAMACPP_CTX:-32768}
+      --n-gpu-layers ${LLAMACPP_GPU_LAYERS:-99}
+      -ctk ${LLAMACPP_KV_TYPE:-turbo3}
+      -ctv ${LLAMACPP_KV_TYPE:-turbo3}
+      --flash-attn
+      ${LLAMACPP_EXTRA_ARGS:-}
+    networks:
+      - local-ai-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 120s
