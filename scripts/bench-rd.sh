@@ -11,6 +11,7 @@ set -euo pipefail
 MODEL_12B="gemma-4-12B-it-qat-UD-Q4_K_XL.gguf"
 MODEL_26B="gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf"
 MTP_HEAD_12B="mtp-gemma-4-12B-it.gguf"
+MODEL_QWEN35_9B="Qwen3.5-9B-Q4_K_M.gguf"
 STD_IMAGE="ghcr.io/ggml-org/llama.cpp:server-cuda"
 TQ_IMAGE="local-ai-stack/llamacpp-tq"
 VOLUME="local-ai-stack_llamacpp-models"
@@ -49,7 +50,7 @@ case "$PHASE" in
         KV_TYPE="turbo3"
         GPU_LAYERS=99
         DEFAULT_SIZES="32768 65536 98304 131072"
-        EXTRA_ARGS=(--flash-attn)
+        EXTRA_ARGS=(--flash-attn on)
         ;;
     26b)
         MODEL="$MODEL_26B"
@@ -73,14 +74,22 @@ case "$PHASE" in
         KV_TYPE="turbo3"
         GPU_LAYERS=99
         DEFAULT_SIZES="32768 65536 98304"
-        EXTRA_ARGS=(--flash-attn
-            --mtp-head "/models/$MTP_HEAD_12B"
-            --spec-type mtp
-            --draft-block-size 3
-            -ngld 99)
+        EXTRA_ARGS=(--flash-attn on
+            --spec-type draft-mtp
+            --spec-draft-model "/models/$MTP_HEAD_12B"
+            --spec-draft-ngl 99
+            --spec-draft-n-max 3)
+        ;;
+    qwen35-9b)
+        MODEL="$MODEL_QWEN35_9B"
+        IMAGE="$STD_IMAGE"
+        KV_TYPE="f16"
+        GPU_LAYERS=99
+        DEFAULT_SIZES="4096 8192 16384 32768 65536 131072 262144"
+        EXTRA_ARGS=()
         ;;
     *)
-        echo "Usage: bench-rd.sh [f16|q4_0|turbo3|26b|26b-f16kv|mtp] [sizes...]"
+        echo "Usage: bench-rd.sh [f16|q4_0|turbo3|26b|26b-f16kv|mtp|qwen35-9b] [sizes...]"
         exit 1
         ;;
 esac
