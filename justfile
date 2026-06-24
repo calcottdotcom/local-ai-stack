@@ -110,6 +110,48 @@ up provider:
             [[ $i -lt 150 ]] && sleep 2 || echo "! Llama.cpp still loading after 5m — check: just logs llamacpp"
         done
         ;;
+    llamacpp-tq)
+        if [[ "$PLATFORM" == "mac" ]]; then
+            echo "Llama.cpp TurboQuant is not supported on macOS."
+            exit 1
+        fi
+        [[ -n "${LLAMACPP_MODEL:-}" ]] || {
+            echo "No model set. Run: just download llamacpp model <huggingface-repo>"
+            exit 1
+        }
+        if [[ -n "$(docker ps -q --filter name=llamacpp 2>/dev/null)" ]]; then
+            echo "Stopping llamacpp before starting llamacpp-tq..."
+            {{dc}} -f {{cf}}docker-compose.llamacpp.yml \
+                -f "{{cf}}docker-compose.gpu-${GPU}-llamacpp.yml" down llamacpp 2>/dev/null || true
+        fi
+        if [[ -n "$(docker ps -q --filter name=ollama 2>/dev/null)" ]]; then
+            echo "Stopping ollama before starting llamacpp-tq..."
+            {{dc}} -f {{cf}}docker-compose.yml -f {{cf}}docker-compose.ollama.yml \
+                -f "{{cf}}docker-compose.gpu-${GPU}-ollama.yml" down ollama 2>/dev/null || true
+        fi
+        sedi "s|^INFERENCE_PROVIDER=.*|INFERENCE_PROVIDER=llamacpp-tq|"                .env
+        sedi "s|^INFERENCE_BASE_URL=.*|INFERENCE_BASE_URL=http://llamacpp:8080/v1|" .env
+        sedi "s|^OLLAMA_BASE_URL=.*|OLLAMA_BASE_URL=|"                              .env
+        sedi "s|^OPENAI_API_BASE_URL=.*|OPENAI_API_BASE_URL=http://llamacpp:8080/v1|" .env
+        [[ -n "${LLAMACPP_MODEL:-}" ]] && \
+            sedi "s|^INFERENCE_MODEL=.*|INFERENCE_MODEL=${LLAMACPP_MODEL}|" .env || true
+        echo "Starting Llama.cpp TurboQuant (first run builds from source — allow ~30 min)..."
+        {{dc}} \
+            -f {{cf}}docker-compose.yml \
+            -f {{cf}}docker-compose.llamacpp-tq.yml \
+            -f "{{cf}}docker-compose.gpu-${GPU}-llamacpp-tq.yml" \
+            up -d
+        PORT="${LLAMACPP_PORT:-8089}"
+        echo "Waiting for Llama.cpp TurboQuant to load model..."
+        for i in $(seq 1 150); do
+            HTTP_STATUS=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:${PORT}/health" 2>/dev/null || echo "000")
+            if [[ "$HTTP_STATUS" == "200" ]]; then
+                echo "✓ Llama.cpp TurboQuant ready — http://localhost:${PORT}"
+                break
+            fi
+            [[ $i -lt 150 ]] && sleep 2 || echo "! Llama.cpp TurboQuant still loading — check: just logs llamacpp"
+        done
+        ;;
     comfy)
         if [[ "$PLATFORM" == "mac" ]]; then
             echo "ComfyUI GPU passthrough is not supported on macOS."
@@ -123,7 +165,7 @@ up provider:
             up -d comfyui
         ;;
     *)
-        echo "Usage: just up [ollama|llamacpp|comfy]"
+        echo "Usage: just up [ollama|llamacpp|llamacpp-tq|comfy]"
         exit 1
         ;;
     esac
@@ -449,6 +491,13 @@ test-inference:
     echo "✓ Inference smoke test passed"
 
 # ── GPU utilities ──────────────────────────────────────────────────────────
+
+# R&D context benchmark — tests a ladder of context sizes and reports VRAM, PP and TG tok/s.
+# just bench                         → TurboQuant fork, default ladder
+# just bench llamacpp                → standard image, narrower ladder
+# just bench llamacpp-tq 32768 65536 131072  → custom sizes
+bench variant="llamacpp-tq" *sizes="":
+    @bash scripts/bench-context.sh "{{variant}}" {{sizes}}
 
 # Check GPU status
 gpucheck:

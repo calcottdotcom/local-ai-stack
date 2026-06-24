@@ -30,6 +30,10 @@ services:
     networks:
       - local-ai-net
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1g
 
   searxng:
     image: searxng/searxng:latest
@@ -43,6 +47,10 @@ services:
     networks:
       - local-ai-net
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512m
 
   hermes:
     build: ./docker/hermes
@@ -70,6 +78,10 @@ services:
     networks:
       - local-ai-net
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 3g
 
   pi:
     build: ./docker/pi
@@ -94,6 +106,10 @@ services:
     networks:
       - local-ai-net
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2g
 
   ubuntu-server:
     build: ./docker/ubuntu-server
@@ -103,6 +119,10 @@ services:
     networks:
       - local-ai-net
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512m
 
   nginx:
     image: nginx:alpine
@@ -121,3 +141,7 @@ services:
       - openwebui
       - searxng
       - hermes
+    deploy:
+      resources:
+        limits:
+          memory: 128m
