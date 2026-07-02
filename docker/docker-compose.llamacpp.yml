@@ -17,6 +17,8 @@ services:
       --port 8080
       --ctx-size ${LLAMACPP_CTX:-8192}
       --n-gpu-layers ${LLAMACPP_GPU_LAYERS:-99}
+      -ctk ${LLAMACPP_KV_TYPE:-f16}
+      -ctv ${LLAMACPP_KV_TYPE:-f16}
       ${LLAMACPP_EXTRA_ARGS:-}
     networks:
       - local-ai-net

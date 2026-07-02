@@ -238,6 +238,24 @@ jobs:
           assert_eq "6GB  + 2GB model  → 65536"  "$(recommend_ctx  6 2)"  "65536"
           assert_eq "4GB  + 3GB model  → 16384"  "$(recommend_ctx  4 3)"  "16384"
 
+          echo "recommend_llamacpp_model:"
+          assert_eq "24GB → 26B repo"  "$(recommend_llamacpp_model 24)" "unsloth/gemma-4-26B-A4B-it-qat-GGUF"
+          assert_eq "12GB → 26B repo"  "$(recommend_llamacpp_model 12)" "unsloth/gemma-4-26B-A4B-it-qat-GGUF"
+          assert_eq "8GB  → 7B repo"   "$(recommend_llamacpp_model  8)" "Qwen/Qwen2.5-7B-Instruct-GGUF"
+          assert_eq "3GB  → none"      "$(recommend_llamacpp_model  3)" "none"
+
+          echo "recommend_llamacpp_gpu_layers:"
+          assert_eq "12GB + 26B → 23"  "$(recommend_llamacpp_gpu_layers 12 'gemma-4-26B-A4B-foo.gguf')" "23"
+          assert_eq "8GB  + 26B → 16"  "$(recommend_llamacpp_gpu_layers  8 'gemma-4-26B-A4B-foo.gguf')" "16"
+          assert_eq "12GB + 12B → 99"  "$(recommend_llamacpp_gpu_layers 12 'gemma-4-12B-foo.gguf')"     "99"
+          assert_eq "8GB  + 9B  → 99"  "$(recommend_llamacpp_gpu_layers  8 'Qwen3.5-9B-Q4_K_M.gguf')"  "99"
+
+          echo "recommend_llamacpp_ctx:"
+          assert_eq "12GB + 26B → 98304"   "$(recommend_llamacpp_ctx 12 'gemma-4-26B-A4B-foo.gguf')"  "98304"
+          assert_eq "8GB  + 26B → 65536"   "$(recommend_llamacpp_ctx  8 'gemma-4-26B-A4B-foo.gguf')"  "65536"
+          assert_eq "12GB + 12B → 196608"  "$(recommend_llamacpp_ctx 12 'gemma-4-12B-foo.gguf')"       "196608"
+          assert_eq "8GB  + 9B  → 65536"   "$(recommend_llamacpp_ctx  8 'Qwen3.5-9B-Q4_K_M.gguf')"   "65536"
+
           exit $fail
 
   # ── GPU smoke test (no GPU in CI — always allow failure) ──────────────────

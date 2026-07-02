@@ -80,5 +80,11 @@ fi
 
 HERMES_PYTHON="/usr/local/lib/hermes-agent/venv/bin/python"
 
+# Gateway must run alongside the webui — it handles agent session routing.
+# 'gateway run' is the foreground form recommended for Docker/WSL; nohup +
+# disown detach it from this shell so exec-ing into server.py doesn't orphan it.
+nohup hermes gateway run > /root/.hermes/gateway.log 2>&1 &
+disown
+
 cd /opt/hermes-webui
 exec "$HERMES_PYTHON" server.py
